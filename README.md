@@ -1,8 +1,6 @@
-# DeepPath: A Reinforcement Learning Method for Knowledge Graph Reasoning
+# Reinforcement Learning Method for Knowledge Graph Reasoning
 
-PyTorch implementation of the algorithm DeepPath. Paper available here: https://arxiv.org/abs/1707.06690
-
-The code has been adapted from the original DeepPath code in TensorFlow available here: https://github.com/xwhan/DeepPath
+Development of reinforcement learning approach for knowledge graph reasoning 
 
 ## Access the dataset
 For dawnloading NELL-995 dataset run upload.sh script; FB15k-237 is avaliable [here](https://drive.google.com/file/d/1klWL11nW3ZS6b2MtLW0MHnXu-XlJqDyA/view?usp=sharing)
