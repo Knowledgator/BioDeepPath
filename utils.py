@@ -22,6 +22,29 @@ max_steps_test = 50
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
+class Kids:
+    def __init__(self, dataPath):
+        f1 = open(dataPath + 'entities.tsv')
+        f2 = open(dataPath + 'relations.tsv')
+        self.entity2id = f1.readlines()
+        self.relation2id = f2.readlines()
+        f1.close()
+        f2.close()
+        self.entity2id_ = {}
+        self.relation2id_ = {}
+        self.relations = []
+
+        for line in self.entity2id:
+            line = line.split()
+            self.entity2id_[line[1]] = int(line[0])
+        for line in self.relation2id:
+            line = line.split()
+            self.relation2id_[line[1]] = int(line[0])
+            self.relations.append(line[1])
+        self.id2entity = {v:k for k,v in self.entity2id_.items()}
+        self.id2relation = {v:k for k,v in self.relation2id_.items()}
+        self.entity2vec = np.loadtxt(dataPath + 'entity2vec.bern')
+        self.relation2vec = np.loadtxt(dataPath + 'relation2vec.bern')
 
 def distance(e1, e2):
     return np.sqrt(np.sum(np.square(e1 - e2)))
@@ -29,6 +52,23 @@ def distance(e1, e2):
 
 def compare(v1, v2):
     return sum(v1 == v2)
+
+def create_kb(graphpath):
+    f = open(graphpath)
+    kb_all = f.readlines()
+    f.close()
+    kb = {}
+    for line in kb_all:
+        r = line.split()[1]
+        s = line.split()[0]
+        t = line.split()[2]
+        if s not in kb:
+            kb[s] = {r:{t}}
+        elif r not in kb[s]:
+            kb[s][r] = {t}
+        else:
+            kb[s][r].add(t)
+    return kb
 
 
 def teacher(e1, e2, num_paths, env, path=None):
@@ -89,15 +129,15 @@ def teacher(e1, e2, num_paths, env, path=None):
     print(res_path_lists_new)
 
     good_episodes = []
-    targetID = env.entity2id_[e2]
+    targetID = env.kids.entity2id_[e2]
     for path in zip(res_entity_lists_new, res_path_lists_new):
         good_episode = []
         for i in range(len(path[0]) - 1):
-            currID = env.entity2id_[path[0][i]]
-            nextID = env.entity2id_[path[0][i + 1]]
+            currID = env.kids.entity2id_[path[0][i]]
+            nextID = env.kids.entity2id_[path[0][i + 1]]
             state_curr = [currID, targetID, 0]
             state_next = [nextID, targetID, 0]
-            actionID = env.relation2id_[path[1][i]]
+            actionID = env.kids.relation2id_[path[1][i]]
             good_episode.append(
                 Transition(state=env.idx_state(state_curr), action=actionID, next_state=env.idx_state(state_next),
                            reward=1))
@@ -135,9 +175,3 @@ def prob_norm(probs):
 if __name__ == '__main__':
     print
     prob_norm(np.array([1, 1, 1]))
-# path_clean('/common/topic/webpage./common/webpage/category -> /m/08mbj5d -> /common/topic/webpage./common/webpage/category_inv -> /m/01d34b -> /common/topic/webpage./common/webpage/category -> /m/08mbj5d -> /common/topic/webpage./common/webpage/category_inv -> /m/0lfyx -> /common/topic/webpage./common/webpage/category -> /m/08mbj5d -> /common/topic/webpage./common/webpage/category_inv -> /m/01y67v -> /common/topic/webpage./common/webpage/category -> /m/08mbj5d -> /common/topic/webpage./common/webpage/category_inv -> /m/028qyn -> /people/person/nationality -> /m/09c7w0')
-
-
-
-
-
