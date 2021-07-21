@@ -17,9 +17,19 @@ import torch.optim as optim
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
+relation = sys.argv[1]
+
+dataPath = sys.argv[2]
+model_dir = '../models'
+model_name = 'policy_supervised_' + relation
+# episodes = int(sys.argv[2])
+graphpath = dataPath + 'kb_env_rl.txt'
+relationPath = dataPath + 'tasks/' + relation + '/' + 'train_pos'
+
 # hyperparameters
+
 state_dim = 200
-action_space = 400
+action_space = 56
 eps_start = 1
 eps_end = 0.1
 epe_decay = 1000
@@ -30,16 +40,6 @@ gamma = 0.99
 target_update_freq = 1000
 max_steps = 50
 max_steps_test = 50
-
-relation = sys.argv[1]
-
-dataPath = sys.argv[2]
-model_dir = '../models'
-model_name = 'policy_supervised_' + relation
-# episodes = int(sys.argv[2])
-graphpath = dataPath + 'kb_env_rl.txt'
-relationPath = dataPath + 'tasks/' + relation + '/' + 'train_pos'
-
 
 class PolicyNetwork(nn.Module):
 
@@ -72,7 +72,7 @@ def train_deep_path():
 
     policy_network = PolicyNetwork(state_dim, action_space).to(device)
     f = open(relationPath)
-    train_data = f.readlines()
+    train_data = f.readlines()[:500]
     f.close()
     num_samples = len(train_data)
 
@@ -81,11 +81,15 @@ def train_deep_path():
     else:
         num_episodes = num_samples
 
+    # Knowledge Graph for path finding
+    kb = create_kb(graphpath)
+    kids = Kids(dataPath)
+
     for episode in range(num_samples):
         print("Episode %d" % episode)
         print('Training Sample:', train_data[episode % num_samples][:-1])
 
-        env = KGEnvironment(dataPath, train_data[episode % num_samples])
+        env = KGEnvironment(kb, kids, train_data[episode % num_samples])
         sample = train_data[episode % num_samples].split()
         # good_episodes = teacher(sample[0], sample[1], 5, env, graphpath)
         try:
@@ -126,9 +130,13 @@ def test(test_episodes):
 
     policy_network = torch.load(os.path.join(model_dir, model_name + '.pt')).to(device)
     print('Model reloaded')
+    # Knowledge Graph for path finding
+    kb = create_kb(graphpath)
+    kids = Kids(dataPath)
+
     for episode in range(len(test_data)):
         print('Test sample %d: %s' % (episode, test_data[episode][:-1]))
-        env = KGEnvironment(dataPath, test_data[episode])
+        env = KGEnvironment(kb, kids, test_data[episode])
         sample = test_data[episode].split()
         state_idx = [env.entity2id_[sample[0]], env.entity2id_[sample[1]], 0]
         for t in count():
