@@ -49,15 +49,19 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
     path_found_entity = []
     path_relation_found = []
 
+    # Knowledge Graph for path finding
+    kb = create_kb(graphpath)
+    kids = Kids(dataPath)
+
     for i_episode in range(num_episodes):
         start = time.time()
         print('Episode %d' % i_episode)
         print('Training sample: ', train[i_episode][:-1])
 
-        env = KGEnvironment(dataPath, train[i_episode])
+        env = KGEnvironment(kb, kids, train[i_episode])
 
         sample = train[i_episode].split()
-        state_idx = [env.entity2id_[sample[0]], env.entity2id_[sample[1]], 0]
+        state_idx = [kids.entity2id_[sample[0]], kids.entity2id_[sample[1]], 0]
 
         episode = []
         state_batch_negative = []
@@ -76,7 +80,7 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
             new_state_vec = env.idx_state(new_state)
             episode.append(Transition(state=state_vec, action=action_chosen, next_state=new_state_vec, reward=reward))
 
-            if done or t == 2:
+            if done or t == 10:
                 break
 
             state_idx = new_state
@@ -153,7 +157,7 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
             policy_network.optimizer.step()
 
             print('Failed, Do one teacher guideline')
-            try:
+            try:      
                 good_episodes = teacher(sample[0], sample[1], 1, env, graphpath)
                 for item in good_episodes:
                     teacher_state_batch = []
@@ -240,9 +244,13 @@ def test():
     if test_num > 500:
         test_num = 500
 
+    # Knowledge Graph for path finding
+    kb = create_kb(graphpath)
+    kids = Kids(dataPath)
+
     for episode in range(test_num):
         print('Test sample %d: %s' % (episode, test_data[episode][:-1]))
-        env = KGEnvironment(dataPath, test_data[episode])
+        env = KGEnvironment(kb, kids, test_data[episode])
         sample = test_data[episode].split()
         state_idx = [env.entity2id_[sample[0]], env.entity2id_[sample[1]], 0]
 
