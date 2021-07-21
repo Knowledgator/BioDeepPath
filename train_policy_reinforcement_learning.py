@@ -17,9 +17,17 @@ from train_policy_supervised_learning import PolicyNetwork
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-# hyperparameters
+relation = sys.argv[1]
+task = sys.argv[2]
+dataPath = sys.argv[3]
+graphpath = os.path.join(dataPath, 'kb_env_rl.txt')
+relationPath = os.path.join(dataPath, 'tasks/', relation, 'train_pos')
+
+model_dir = '../models'
+model_name = 'DeepPath' + relation
+
 state_dim = 200
-action_space = 400
+action_space = 56
 eps_start = 1
 eps_end = 0.1
 epe_decay = 1000
@@ -30,15 +38,6 @@ gamma = 0.99
 target_update_freq = 1000
 max_steps = 50
 max_steps_test = 50
-
-relation = sys.argv[1]
-dataPath = sys.argv[2]
-graphpath = os.path.join(dataPath, 'kb_env_rl.txt')
-relationPath = os.path.join(dataPath, 'tasks/', relation, 'train_pos')
-
-model_dir = '../models'
-model_name = 'DeepPath' + relation
-
 
 def REINFORCE(training_pairs, policy_network, num_episodes):
 
@@ -67,6 +66,7 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
             state_vec = torch.from_numpy(env.idx_state(state_idx)).float().to(device)
             action_probs = policy_network(state_vec)
             action_chosen = np.random.choice(np.arange(action_space), p=np.squeeze(action_probs.cpu().detach().numpy()))
+            # print(env. get_valid_actions(state_idx[0]))
             reward, new_state, done = env.interact(state_idx, action_chosen)
 
             if reward == -1:  # the action fails for this step
@@ -76,7 +76,7 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
             new_state_vec = env.idx_state(new_state)
             episode.append(Transition(state=state_vec, action=action_chosen, next_state=new_state_vec, reward=reward))
 
-            if done or t == max_steps:
+            if done or t == 2:
                 break
 
             state_idx = new_state
@@ -202,7 +202,7 @@ def retrain():
     policy_network = PolicyNetwork(state_dim, action_space)
 
     f = open(relationPath)
-    training_pairs = f.readlines()
+    training_pairs = f.readlines()[:500]
     f.close()
 
     policy_network = torch.load(os.path.join(model_dir, 'policy_supervised_' + relation + '.pt')).to(device)
@@ -220,7 +220,7 @@ def retrain():
 def test():
 
     f = open(relationPath)
-    all_data = f.readlines()
+    all_data = f.readlines()[:10]
     f.close()
 
     test_data = all_data
