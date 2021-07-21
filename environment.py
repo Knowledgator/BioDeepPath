@@ -41,7 +41,16 @@ class KGEnvironment(object):
             if chosed_relation in self.kb[source]:
                 targets = self.kb[source][chosed_relation]
                 for target in targets:
-                    choices.append([source, chosed_relation, target])
+                    if self.kids.entity2id_[target] == target_pos:
+                        self.path.append(source + ' -> ' + target)
+                        self.path_relations.append(chosed_relation)
+                        print('Find a path:', self.path)
+                        done = 1
+                        reward = 0
+                        new_state = None
+                        return (reward, new_state, done) 
+                    else:
+                        choices.append([source, chosed_relation, target])
 
         # for line in self.kb:
         #     triple = line.rsplit()
