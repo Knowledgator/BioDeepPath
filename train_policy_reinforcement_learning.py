@@ -32,11 +32,10 @@ max_steps = 50
 max_steps_test = 50
 
 relation = sys.argv[1]
-task = sys.argv[2]
-graphpath = os.path.join(dataPath, 'tasks', relation, 'graph.txt')
+dataPath = sys.argv[2]
+graphpath = os.path.join(dataPath, 'kb_env_rl.txt')
 relationPath = os.path.join(dataPath, 'tasks/', relation, 'train_pos')
 
-dataPath = '../NELL-995/'
 model_dir = '../models'
 model_name = 'DeepPath' + relation
 
