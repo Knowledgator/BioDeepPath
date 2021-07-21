@@ -67,8 +67,10 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
         state_batch_negative = []
         action_batch_negative = []
         for t in count():
+            policy_network.eval()
             state_vec = torch.from_numpy(env.idx_state(state_idx)).float().to(device)
-            action_probs = policy_network(state_vec)
+            with torch.no_grad():
+                action_probs = policy_network(state_vec)
             action_chosen = np.random.choice(np.arange(action_space), p=np.squeeze(action_probs.cpu().detach().numpy()))
             # print(env. get_valid_actions(state_idx[0]))
             reward, new_state, done = env.interact(state_idx, action_chosen)
@@ -80,7 +82,7 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
             new_state_vec = env.idx_state(new_state)
             episode.append(Transition(state=state_vec, action=action_chosen, next_state=new_state_vec, reward=reward))
 
-            if done or t == 10:
+            if done or t == max_steps:
                 break
 
             state_idx = new_state
@@ -88,10 +90,12 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
         # Discourage the agent when it choose an invalid step
         if len(state_batch_negative) != 0:
             print('Penalty to invalid steps:', len(state_batch_negative))
+            policy_network.train()
+            policy_network.optimizer.zero_grad()
             state_batch_negative = torch.cat(state_batch_negative).to(device)
             action_batch_negative = torch.LongTensor(action_batch_negative).to(device)
             predictions = policy_network(state_batch_negative)
-            loss = policy_network.compute_loss_rl(predictions, -0.05, action_batch_negative)
+            loss = policy_network.compute_loss_rl(predictions, -0.1, action_batch_negative)
             loss.backward()
             policy_network.optimizer.step()
 
@@ -130,6 +134,8 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
                 if transition.reward == 0:
                     state_batch.append(transition.state)
                     action_batch.append(transition.action)
+            policy_network.train()
+            policy_network.optimizer.zero_grad()
             state_batch = torch.cat(state_batch).to(device)
             action_batch = torch.LongTensor(action_batch).to(device)
             predictions = policy_network(state_batch)
@@ -137,7 +143,7 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
             loss.backward()
             policy_network.optimizer.step()
         else:
-            global_reward = -0.05
+            global_reward = -0.1
             # length_reward = 1/len(env.path)
 
             state_batch = []
@@ -149,6 +155,8 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
                     action_batch.append(transition.action)
             if len(state_batch) == 0:
                 continue
+            policy_network.train()
+            policy_network.optimizer.zero_grad()
             state_batch = torch.cat(state_batch).to(device)
             action_batch = torch.LongTensor(action_batch).to(device)
             predictions = policy_network(state_batch)
@@ -156,24 +164,24 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
             loss.backward()
             policy_network.optimizer.step()
 
-            print('Failed, Do one teacher guideline')
-            try:      
-                good_episodes = teacher(sample[0], sample[1], 1, env, graphpath)
-                for item in good_episodes:
-                    teacher_state_batch = []
-                    teacher_action_batch = []
-                    total_reward = 0.0 * 1 + 1 * 1 / len(item)
-                    for t, transition in enumerate(item):
-                        teacher_state_batch.append(transition.state)
-                        teacher_action_batch.append(transition.action)
-                    teacher_state_batch = torch.FloatTensor(teacher_state_batch).squeeze().to(device)
-                    teacher_action_batch = torch.LongTensor(teacher_action_batch).to(device)
-                    predictions = policy_network(teacher_state_batch)
-                    loss = policy_network.compute_loss_rl(predictions, 1, teacher_action_batch)
-                    loss.backward()
-                    policy_network.optimizer.step()
-            except Exception as e:
-                print('Teacher guideline failed')
+            # print('Failed, Do one teacher guideline')
+            # try:      
+            #     good_episodes = teacher(sample[0], sample[1], 1, env, graphpath)
+            #     for item in good_episodes:
+            #         teacher_state_batch = []
+            #         teacher_action_batch = []
+            #         total_reward = 0.0 * 1 + 1 * 1 / len(item)
+            #         for t, transition in enumerate(item):
+            #             teacher_state_batch.append(transition.state)
+            #             teacher_action_batch.append(transition.action)
+            #         teacher_state_batch = torch.FloatTensor(teacher_state_batch).squeeze().to(device)
+            #         teacher_action_batch = torch.LongTensor(teacher_action_batch).to(device)
+            #         predictions = policy_network(teacher_state_batch)
+            #         loss = policy_network.compute_loss_rl(predictions, 1, teacher_action_batch)
+            #         loss.backward()
+            #         policy_network.optimizer.step()
+            # except Exception as e:
+            #     print('Teacher guideline failed')
 
         print('Episode time: ', time.time() - start)
         print('\n')
@@ -200,21 +208,22 @@ def REINFORCE(training_pairs, policy_network, num_episodes):
 
 
 def retrain():
-
+    epochs = 10
     # TODO: Fix this - load saved model and optimizer state to Policy_network.policy_nn.
     print('Start retraining')
     policy_network = PolicyNetwork(state_dim, action_space)
 
     f = open(relationPath)
-    training_pairs = f.readlines()[:500]
+    training_pairs = f.readlines()[:]
     f.close()
 
     policy_network = torch.load(os.path.join(model_dir, 'policy_supervised_' + relation + '.pt')).to(device)
     torch.save(policy_network, os.path.join(model_dir, model_name + relation + '.pt'))
     print("sl_policy restored")
     episodes = len(training_pairs)
-    if episodes > 300:
-        episodes = 300
+    if episodes > 3000:
+        episodes = 3000
+    # for epoch in range(epochs):
     REINFORCE(training_pairs, policy_network, episodes)
     # save model
     print("Saving model to disk...")
@@ -224,7 +233,7 @@ def retrain():
 def test():
 
     f = open(relationPath)
-    all_data = f.readlines()[:10]
+    all_data = f.readlines()[:]
     f.close()
 
     test_data = all_data
@@ -252,7 +261,7 @@ def test():
         print('Test sample %d: %s' % (episode, test_data[episode][:-1]))
         env = KGEnvironment(kb, kids, test_data[episode])
         sample = test_data[episode].split()
-        state_idx = [env.entity2id_[sample[0]], env.entity2id_[sample[1]], 0]
+        state_idx = [kids.entity2id_[sample[0]], kids.entity2id_[sample[1]], 0]
 
         transitions = []
 
@@ -274,30 +283,6 @@ def test():
                     print('Episode ends due to step limit\n')
                 break
             state_idx = new_state
-
-        if done:
-            if len(path_set) != 0:
-                path_found_embedding = [env.path_embedding(path.split(' -> ')) for path in path_set]
-                curr_path_embedding = env.path_embedding(env.path_relations)
-                path_found_embedding = np.reshape(path_found_embedding, (-1, embedding_dim))
-                cos_sim = cosine_similarity(path_found_embedding, curr_path_embedding)
-                diverse_reward = -np.mean(cos_sim)
-                print('diverse_reward', diverse_reward)
-                # total_reward = 0.1*global_reward + 0.8*length_reward + 0.1*diverse_reward
-                state_batch = []
-                action_batch = []
-                for t, transition in enumerate(transitions):
-                    if transition.reward == 0:
-                        state_batch.append(transition.state)
-                        action_batch.append(transition.action)
-                # TODO: WUT?? Training in test()
-                state_batch = torch.cat(state_batch).to(device)
-                action_batch = torch.LongTensor(action_batch).to(device)
-                predictions = policy_network(state_batch)
-                loss = policy_network.compute_loss_rl(predictions, total_reward, action_batch)
-                loss.backward()
-                policy_network.optimizer.step()
-            path_set.add(' -> '.join(env.path_relations))
 
     for path in path_found:
         rel_ent = path.split(' -> ')
