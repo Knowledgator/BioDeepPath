@@ -41,7 +41,7 @@ class KGEnvironment(object):
                 targets = self.kb[source][chosed_relation]
                 for target in targets:
                     if self.kids.entity2id_[target] == target_pos:
-                        self.path.append(source + ' -> ' + target)
+                        self.path.append(chosed_relation + ' -> ' + target)
                         self.path_relations.append(chosed_relation)
                         print('Find a path:', self.path)
                         done = 1
