@@ -189,7 +189,10 @@ def evaluate_logic():
 		if item[1] == 1:
 			correct +=  1
 			ranks.append(correct/(1.0+idx_))
-	aps.append(np.mean(ranks))
+	if len(ranks) ==0:
+		aps.append(0)
+	else:
+		aps.append(np.mean(ranks))
 
 	score_label = zip(score_all, test_labels)
 	score_label_ranked = sorted(score_label, key = lambda x:x[0], reverse=True)
@@ -256,5 +259,3 @@ def bfs_two(e1,e2,path,kb,kb_inv):
 
 if __name__ == '__main__':
 	evaluate_logic()
-
-
