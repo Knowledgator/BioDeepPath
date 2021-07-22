@@ -4,13 +4,15 @@ import sys
 import numpy as np
 from BFS.KB import *
 import torch
+import re
 from networks import MLP
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 relation = sys.argv[1]
 dataPath = sys.argv[2]
-dataPath_ = dataPath  + relation
+dataPath_ = dataPath + '/tasks/' + relation
 featurePath = dataPath_ + '/path_to_use.txt'
-feature_stats = dataPath_ + '/path_stats.txt'
+feature_stats =  dataPath_ + '/path_stats.txt'
 relationId_path = dataPath + 'relations.tsv'
 
 def train(kb, kb_inv, named_paths):
@@ -20,8 +22,8 @@ def train(kb, kb_inv, named_paths):
 	train_pairs = []
 	train_labels = []
 	for line in train_data:
-		e1 = line.split(',')[0].replace('thing$','')
-		e2 = line.split(',')[1].split(':')[0].replace('thing$','')
+		e1 = line.split()[0]
+		e2 = line.split()[1]
 		if (e1 not in kb.entities) or (e2 not in kb.entities):
 			continue
 		train_pairs.append((e1,e2))
@@ -56,7 +58,7 @@ def get_features():
 	content = f.readlines()
 	f.close()
 	for line in content:
-		relation2id[line.split()[0]] = int(line.split()[1])
+		relation2id[line.split()[1]] = int(line.split()[0])
 
 	useful_paths = []
 	named_paths = []
@@ -90,7 +92,7 @@ def evaluate_logic():
 	kb = KB()
 	kb_inv = KB()
 
-	f = open(dataPath_ + '/graph.txt')
+	f = open(dataPath + '/kb_env_rl.txt')
 	kb_lines = f.readlines()
 	f.close()
 
@@ -98,31 +100,30 @@ def evaluate_logic():
 		e1 = line.split()[0]
 		rel = line.split()[1]
 		e2 = line.split()[2]
-		kb.addRelation(e1,rel,e2)
-		kb_inv.addRelation(e2,rel,e1)
+		if re.search('_inv', rel):
+			kb_inv.addRelation(e1,rel,e2)
+		else:
+			kb.addRelation(e1,rel,e2)
 
 	_, named_paths = get_features()
 
 	model = train(kb, kb_inv, named_paths)
 
 
-	f = open(dataPath_ + '/sort_test.pairs')
+	f = open(dataPath_ + '/test.pairs')
 	test_data = f.readlines()
 	f.close()
 	test_pairs = []
 	test_labels = []
 	# queries = set()
 	for line in test_data:
-		e1 = line.split(',')[0].replace('thing$','')
-		# e1 = '/' + e1[0] + '/' + e1[2:]
-		e2 = line.split(',')[1].split(':')[0].replace('thing$','')
-		# e2 = '/' + e2[0] + '/' + e2[2:]
+		e1 = line.split()[0]
+		e2 = line.split()[1]
 		if (e1 not in kb.entities) or (e2 not in kb.entities):
 			continue
 		test_pairs.append((e1,e2))
 		label = 1 if line[-2] == '+' else 0
 		test_labels.append(label)
-
 	aps = []
 	query = test_pairs[0][0]
 	y_true = []
@@ -139,7 +140,7 @@ def evaluate_logic():
 
 			#features = features*path_weights
 
-			score = model(torch.FloatTensor(features))
+			score = model(torch.FloatTensor(features).to(device))
 			#score = np.sum(features)
 
 			score_all.append(score[0])
@@ -173,7 +174,7 @@ def evaluate_logic():
 			#features = features*path_weights
 			#score = np.inner(features, path_weights)
 			#score = np.sum(features)
-			score = model(torch.FloatTensor(features))
+			score = model(torch.FloatTensor(features).to(device))
 
 			score_all.append(score[0])
 			y_score.append(score)
@@ -255,3 +256,5 @@ def bfs_two(e1,e2,path,kb,kb_inv):
 
 if __name__ == '__main__':
 	evaluate_logic()
+
+
