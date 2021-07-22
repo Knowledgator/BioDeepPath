@@ -7,7 +7,7 @@ class MLP(nn.Module):
 
     def __init__(self, input_dim, n_epochs, batch_size):
         super(MLP, self).__init__()
-        self.fc = nn.Linear(input_dim, 1)
+        self.fc = nn.Linear(input_dim, 1).to(device)
         self.n_epochs = n_epochs
         self.batch_size = batch_size
         self.optimizer = torch.optim.Adam(self.fc.parameters())
