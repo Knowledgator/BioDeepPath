@@ -7,11 +7,11 @@ import torch
 from networks import MLP
 
 relation = sys.argv[1]
-
-dataPath_ = '../NELL-995/tasks/'  + relation
+dataPath = sys.argv[2]
+dataPath_ = dataPath  + relation
 featurePath = dataPath_ + '/path_to_use.txt'
 feature_stats = dataPath_ + '/path_stats.txt'
-relationId_path = '../NELL-995/relation2id.txt'
+relationId_path = dataPath + 'relations.tsv'
 
 def train(kb, kb_inv, named_paths):
 	f = open(dataPath_ + '/train.pairs')
@@ -255,5 +255,3 @@ def bfs_two(e1,e2,path,kb,kb_inv):
 
 if __name__ == '__main__':
 	evaluate_logic()
-
-
