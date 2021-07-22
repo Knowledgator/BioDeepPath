@@ -23,7 +23,7 @@ dataPath = sys.argv[3]
 graphpath = os.path.join(dataPath, 'kb_env_rl.txt')
 relationPath = os.path.join(dataPath, 'tasks/', relation, 'train_pos')
 
-model_dir = '../models'
+model_dir = './models'
 model_name = 'DeepPath' + relation
 
 state_dim = 200
