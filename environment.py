@@ -34,7 +34,6 @@ class KGEnvironment(object):
         curr_pos = state[0]
         target_pos = state[1]
         chosed_relation = self.kids.relations[action]
-        print(curr_pos, chosed_relation, target_pos, len(self.kb))
         choices = []
         if self.kids.id2entity[curr_pos] in self.kb:
             source = self.kids.id2entity[curr_pos]
