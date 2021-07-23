@@ -35,7 +35,7 @@ ent_vec = np.loadtxt(dataPath + '/entity2vec.bern')
 rel_vec = np.loadtxt(dataPath+ '/relation2vec.bern')
 
 f = open(test_data_path)
-test_data = f.readlines()
+test_data = sorted(f.readlines())
 f.close()
 
 test_pairs = []
