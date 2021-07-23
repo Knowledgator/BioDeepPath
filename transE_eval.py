@@ -3,11 +3,17 @@ import numpy as np
 
 relation = sys.argv[1]
 
-dataPath_ = '../NELL-995/tasks/'  + relation
+dataPath = sys.argv[2]
 
-ent_id_path = '../NELL-995/' + 'entity2id.txt'
-rel_id_path = '../NELL-995/' + 'relation2id.txt'
-test_data_path = '../NELL-995/tasks/'  + relation + '/sort_test.pairs'
+dataPath_ = dataPath + 'tasks/' + relation
+
+
+ent_id_path = dataPath + '/entities.tsv'
+rel_id_path = dataPath + '/relations.tsv'
+
+featurePath = dataPath_ + '/path_to_use.txt'
+feature_stats =  dataPath_ + '/path_stats.txt'
+test_data_path = dataPath_ + '/test.pairs'
 
 f1 = open(ent_id_path)
 f2 = open(rel_id_path)
@@ -19,14 +25,14 @@ f2.close()
 entity2id = {}
 relation2id = {}
 for line in content1:
-	entity2id[line.split()[0]] = int(line.split()[1])
+	entity2id[line.split()[1]] = int(line.split()[0])
 
 for line in content2:
-	relation2id[line.split()[0]] = int(line.split()[1])
+	relation2id[line.split()[1]] = int(line.split()[0])
 
 
-ent_vec = np.loadtxt(dataPath_ + '/entity2vec.unif')
-rel_vec = np.loadtxt(dataPath_ + '/relation2vec.unif')
+ent_vec = np.loadtxt(dataPath + '/entity2vec.bern')
+rel_vec = np.loadtxt(dataPath+ '/relation2vec.bern')
 
 f = open(test_data_path)
 test_data = f.readlines()
@@ -36,10 +42,9 @@ test_pairs = []
 test_labels = []
 # queries = set()
 for line in test_data:
-	e1 = line.split(',')[0].replace('thing$','')
-	#e1 = '/' + e1[0] + '/' + e1[2:]
-	e2 = line.split(',')[1].split(':')[0].replace('thing$','')
-	#e2 = '/' + e2[0] + '/' + e2[2:]
+	e1 = line.split()[0]
+	e2 = line.split()[1]
+
 	test_pairs.append((e1,e2))
 	label = 1 if line[-2] == '+' else 0
 	test_labels.append(label)
@@ -53,7 +58,7 @@ query_samples = []
 
 score_all = []
 
-rel = relation.replace("_", ":")
+rel = relation
 relation_vec = rel_vec[relation2id[rel],:]
 
 
