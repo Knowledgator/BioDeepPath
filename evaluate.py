@@ -5,6 +5,7 @@ import numpy as np
 from BFS.KB import *
 import torch
 import re
+from tqdm import tqdm
 from networks import MLP
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -17,7 +18,7 @@ relationId_path = dataPath + 'relations.tsv'
 
 def train(kb, kb_inv, named_paths):
 	f = open(dataPath_ + '/train.pairs')
-	train_data = f.readlines()
+	train_data = sorted(f.readlines())[:1000]
 	f.close()
 	train_pairs = []
 	train_labels = []
@@ -37,9 +38,11 @@ def train(kb, kb_inv, named_paths):
 		training_features.append(feature)
 	training_features = torch.FloatTensor(training_features)
 	input_dim = len(named_paths)
-	model = MLP(input_dim = input_dim, n_epochs = 300, batch_size = 120)
+	model = MLP(input_dim = input_dim, n_epochs = 100, batch_size = 120)
+	# print(model.fc.weight)
 	train_labels = torch.FloatTensor(train_labels)
 	model.train(training_features, train_labels)
+	# print(model.fc.weight)
 	return model
 
 def get_features():
@@ -100,18 +103,16 @@ def evaluate_logic():
 		e1 = line.split()[0]
 		rel = line.split()[1]
 		e2 = line.split()[2]
-		if re.search('_inv', rel):
-			kb_inv.addRelation(e1,rel,e2)
-		else:
-			kb.addRelation(e1,rel,e2)
+		kb.addRelation(e1,rel,e2)
+		kb_inv.addRelation(e2,rel,e1)
 
 	_, named_paths = get_features()
 
-	model = train(kb, kb_inv, named_paths)
+	# model = train(kb, kb_inv, named_paths)
 
 
 	f = open(dataPath_ + '/test.pairs')
-	test_data = f.readlines()
+	test_data = sorted(f.readlines())[:100]
 	f.close()
 	test_pairs = []
 	test_labels = []
@@ -131,7 +132,7 @@ def evaluate_logic():
 
 	score_all = []
 
-	for idx, sample in enumerate(test_pairs):
+	for idx, sample in enumerate(tqdm(test_pairs)):
 		#print 'query node: ', sample[0], idx
 		if sample[0] == query:
 			features = []
@@ -139,11 +140,10 @@ def evaluate_logic():
 				features.append(int(bfs_two(sample[0], sample[1], path, kb, kb_inv)))
 
 			#features = features*path_weights
+			# score = model(torch.FloatTensor(features).to(device))
+			score = np.sum(features)
 
-			score = model(torch.FloatTensor(features).to(device))
-			#score = np.sum(features)
-
-			score_all.append(score[0])
+			score_all.append(score)
 			y_score.append(score)
 			y_true.append(test_labels[idx])
 		else:
@@ -172,11 +172,11 @@ def evaluate_logic():
 				features.append(int(bfs_two(sample[0], sample[1], path, kb, kb_inv)))
 
 			#features = features*path_weights
-			#score = np.inner(features, path_weights)
-			#score = np.sum(features)
-			score = model(torch.FloatTensor(features).to(device))
+			# score = np.inner(features, path_weights)
+			score = np.sum(features)
+			# score = model(torch.FloatTensor(features).to(device))
 
-			score_all.append(score[0])
+			score_all.append(score)
 			y_score.append(score)
 			y_true.append(test_labels[idx])
 			# print y_score, y_true
@@ -216,6 +216,7 @@ def bfs_two(e1,e2,path,kb,kb_inv):
 		left_step = path[start]
 		left_next = set()
 		right_step = path[end-1]
+
 		right_next = set()
 
 		if len(left) < len(right):
@@ -232,10 +233,10 @@ def bfs_two(e1,e2,path,kb,kb_inv):
 						if path_.relation == left_step:
 							left_next.add(path_.connected_entity)
 				except Exception as e:
-					# print 'left', len(left)
-					# print left
-					# print 'not such entity'
-					return False
+					# print ('left', len(left))
+					# print (left)
+					# print ('not such entity')
+					pass
 			left = left_next
 
 		else: 
@@ -247,11 +248,10 @@ def bfs_two(e1,e2,path,kb,kb_inv):
 						if path_.relation == right_step:
 							right_next.add(path_.connected_entity)
 				except Exception as e:
-					# print 'right', len(right)
-					# print 'no such entity'
-					return False
+					# print ('right', len(right))
+					# print ('no such entity')
+					pass
 			right = right_next
-
 	if len(right & left) != 0:
 		return True 
 	return False
