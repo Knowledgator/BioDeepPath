@@ -1,5 +1,4 @@
 #!/bin/bash
-cd /content/BioDeepPath-main
 relation=$1
 path=$2
 python3 train_policy_supervised_learning.py $relation $path

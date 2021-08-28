@@ -20,7 +20,7 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 relation = sys.argv[1]
 
 dataPath = sys.argv[2]
-model_dir = '../models'
+model_dir = 'models'
 model_name = 'policy_supervised_' + relation
 # episodes = int(sys.argv[2])
 graphpath = dataPath + 'kb_env_rl.txt'
@@ -72,7 +72,7 @@ def train_deep_path():
 
     policy_network = PolicyNetwork(state_dim, action_space).to(device)
     f = open(relationPath)
-    train_data = f.readlines()[:500]
+    train_data = f.readlines()[:5]
     f.close()
     num_samples = len(train_data)
 
