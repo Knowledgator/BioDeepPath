@@ -1,9 +1,12 @@
 from __future__ import division
+import argparse
+
 import numpy as np
 from itertools import count
 import os, sys
 
-from networks import PolicyNN
+from networks import PolicyNetwork
+
 from utils import *
 from environment import KGEnvironment
 from BFS.KB import KB
@@ -17,62 +20,42 @@ import torch.optim as optim
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-relation = sys.argv[1]
+all_args = argparse.ArgumentParser()
+all_args.add_argument("-d", "--dataset", required=True,
+   help="name of dataset to use")
+all_args.add_argument("-t", "--task", required=False, default=True,
+   help="relation name for training a model")
+all_args.add_argument("-ed", "--emb_dim", required=False, default=500,
+   help="dimensinality of initial embeddings of enities and relations")
+all_args.add_argument("-em", "--emb_path", required=False, default='../ckpts/TransE_l2_BusinessLink_0',
+   help="dimensinality of hiden state of policy network")
+all_args.add_argument("-r", "--raw", required=False, default=1,
+   help="does file with triples converted to")
+all_args.add_argument("-m", "--model", required=False, default='TransE',
+   help="model name")
+args = vars(all_args.parse_args())
 
-dataPath = sys.argv[2]
 model_dir = 'models'
-model_name = 'policy_supervised_' + relation
-# episodes = int(sys.argv[2])
-graphpath = dataPath + 'kb_env_rl.txt'
-relationPath = dataPath + 'tasks/' + relation + '/' + 'train_pos'
+model_name = 'DeepPath_supervised_'
 
-# hyperparameters
-
-state_dim = 200
-action_space = 56
+state_dim = args['emb_dim']*2
+embedding_dim = args['emb_dim']
 eps_start = 1
 eps_end = 0.1
 epe_decay = 1000
 replay_memory_size = 10000
 batch_size = 128
-embedding_dim = 100
 gamma = 0.99
 target_update_freq = 1000
 max_steps = 50
 max_steps_test = 50
 
-class PolicyNetwork(nn.Module):
-
-    # TODO: Add regularization to policy neural net and add regularization losses to total loss
-    def __init__(self, state_dim, action_space, learning_rate=0.0001):
-        super(PolicyNetwork, self).__init__()
-        self.action_space = action_space
-        self.policy_nn = PolicyNN(state_dim, action_space)
-        self.optimizer = optim.Adam(self.policy_nn.parameters(), lr=learning_rate)
-
-    def forward(self, state):
-        action_prob = self.policy_nn(state)
-        return action_prob
-
-    def compute_loss(self, action_prob, action):
-        # TODO: Add regularization loss
-        action_mask = F.one_hot(action, num_classes=self.action_space) > 0
-        picked_action_prob = action_prob[action_mask]
-        loss = torch.sum(-torch.log(picked_action_prob))
-        return loss
-    
-    def compute_loss_rl(self, action_prob, target, action):
-        # TODO: Add regularization loss
-        action_mask = F.one_hot(action, num_classes=self.action_space) > 0
-        picked_action_prob = action_prob[action_mask]
-        loss = torch.sum(-torch.log(picked_action_prob)*target)
-        return loss
 
 def train_deep_path():
 
     policy_network = PolicyNetwork(state_dim, action_space).to(device)
-    f = open(relationPath)
-    train_data = f.readlines()[:5]
+    f = open(os.path.join('../Data', args['dataset'], 'train.tsv'))
+    train_data = f.readlines()[:25]
     f.close()
     num_samples = len(train_data)
 
@@ -82,8 +65,8 @@ def train_deep_path():
         num_episodes = num_samples
 
     # Knowledge Graph for path finding
-    kb = create_kb(graphpath)
-    kids = Kids(dataPath)
+    kids = Kids(args)
+    kb = create_kb(args, kids)
 
     for episode in range(num_samples):
         print("Episode %d" % episode)
@@ -156,4 +139,3 @@ def test(test_episodes):
 
 if __name__ == "__main__":
     train_deep_path()
-
