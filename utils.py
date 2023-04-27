@@ -1,26 +1,16 @@
 from __future__ import division
-import random
-from collections import namedtuple, Counter
+
+from collections import Counter, namedtuple
+
+import networkx as nx
 import numpy as np
 
-from BFS.KB import KB
 from BFS.BFS import BFS
+from BFS.KB import KB
 
-# hyperparameters
-state_dim = 200
-action_space = 400
-eps_start = 1
-eps_end = 0.1
-epe_decay = 1000
-replay_memory_size = 10000
-batch_size = 128
-embedding_dim = 100
-gamma = 0.99
-target_update_freq = 1000
-max_steps = 50
-max_steps_test = 50
+Transition = namedtuple("Transition",
+                        ("state", "action", "next_state", "reward"))
 
-Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
 class Kids:
     def __init__(self, dataPath):
@@ -46,12 +36,14 @@ class Kids:
         self.entity2vec = np.loadtxt(dataPath + 'entity2vec.bern')
         self.relation2vec = np.loadtxt(dataPath + 'relation2vec.bern')
 
+
 def distance(e1, e2):
     return np.sqrt(np.sum(np.square(e1 - e2)))
 
 
 def compare(v1, v2):
     return sum(v1 == v2)
+
 
 def create_kb(graphpath):
     f = open(graphpath)
@@ -172,6 +164,21 @@ def prob_norm(probs):
     return probs / sum(probs)
 
 
-if __name__ == '__main__':
-    print
-    prob_norm(np.array([1, 1, 1]))
+def get_relationships(ds):
+    relations = []
+    for rels in ds.dict_of_rels.values():
+        for rel in rels:
+            if rel not in relations:
+                relations.append(rel)
+
+    return relations
+
+
+def construct_graph(ds):
+    G = nx.DiGraph()
+    attrs = {}
+    for h, t, r in ds:
+        G.add_edge(h, t)
+        attrs[(h, t)] = r
+    nx.set_edge_attributes(G, attrs, 'relation')
+    return G
