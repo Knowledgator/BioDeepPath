@@ -7,14 +7,21 @@ import torch
 from utils import Transition
 
 
+class NoPathFoundException(Exception):
+    pass
+
+
 class Env:
     def __init__(self, graph: nx.DiGraph, trans_e_model: torch.nn.Module):
+        if len(graph.nodes) == 0:
+            raise ValueError('Cannot operate on empty graph. '
+                             'Recieved graph with `len(graph.nodes) == 0`.')
         self.graph = graph
         self.nodes = list(graph.nodes)
-        self.trans_e_model = trans_e_model
+        self.trans_e_model = trans_e_model.to('cpu').eval()
         self.current_head, self.current_tail = None, None
         self.path = []
-        self.trans_e_model.to('cpu').eval()
+        self.relations = []
 
     def dfs(self, start, end):
         """Performs DFS and path tracking.
@@ -69,26 +76,32 @@ class Env:
                         return
                     visited.add(node)
 
-        def _construct_path():
-            """Nested function to construct the path.
+        def _trace_and_construct_path():
+            """Nested function to trace the path
+               from the `path` dictionary and constructs the path.
             """
             nonlocal start, end, path
             constructed_path = [end]
             while constructed_path[-1] != start:
-                constructed_path.append(path[constructed_path[-1]])
+                try:
+                    constructed_path.append(path[constructed_path[-1]])
+                except KeyError:
+                    raise NoPathFoundException('No Path found from '
+                                               f'{constructed_path[-1]} '
+                                               f'to {start}.')
 
             constructed_path.reverse()
             return constructed_path
 
         _bfs()
-        constructed_path = _construct_path()
+        constructed_path = _trace_and_construct_path()
         return constructed_path
 
     def has_path(self, entity_1, entity_2):
         try:
             path = self.bfs(entity_1, entity_2)
             return len(path) > 0
-        except Exception:
+        except NoPathFoundException:
             return False
 
     def sample_path(self):
@@ -99,10 +112,16 @@ class Env:
         end_node = random.choice(list(self.graph.nodes - [start_node]))
         start_node, end_node = self.sample_two_entities()
         print(f"start node: {start_node} - end node: {end_node}")
-        path = self.bfs(start_node, end_node)
-        if len(path) == 0:
-            print(f"No path found from {start_node} to {end_node}. Trying again...")
-            return self.sample_path()
+        try:
+            path = self.bfs(start_node, end_node)
+            if len(path) == 0:
+                print(f"No path found from {start_node} to {end_node}. "
+                      "Trying again...")
+                return self.sample_path()
+        except NoPathFoundException:
+            print(f"No path found from {start_node} to {end_node}. "
+                  "Trying again...")
+            self.sample_path()
         return path
 
     def get_state_embedding(self, state):
@@ -112,7 +131,8 @@ class Env:
         with torch.no_grad():
             current_entity_embed = self.trans_e_model.ent_emb(torch.tensor([current_entity]))
             target_entity_embed = self.trans_e_model.ent_emb(torch.tensor([target_entity]))
-        new_state = (current_entity_embed, target_entity_embed - current_entity_embed)
+        new_state = (current_entity_embed,
+                     target_entity_embed - current_entity_embed)
         new_state = torch.concatenate(new_state, dim=-1)
         return new_state
 
@@ -121,9 +141,11 @@ class Env:
         """
         intermediate_nodes = set()
         if num_paths > len(self.nodes) - 2:
-            raise ValueError('Number of Intermediates picked is larger than possible',
-                             'num_entities: {}'.format(len(self.entities)), 'num_itermediates: {}'.format(num_paths))
-        for i in range(num_paths):
+            raise ValueError('Number of Intermediates picked is '
+                             'larger than possible '
+                             f'num_entities: {len(self.entities)}'
+                             f'num_itermediates: {num_paths}')
+        for _ in range(num_paths):
             itermediate = random.choice(self.nodes)
             while itermediate in intermediate_nodes or itermediate == entity1 or itermediate == entity2:
                 itermediate = random.choice(self.nodes)
@@ -141,9 +163,18 @@ class Env:
             print(f"start node: {start_node} - end node: {end_node}")
 
         if not self.has_path(start_node, end_node):
-            print(f"No path found from {start_node} to {end_node}. Trying again...")
+            print(f"No path found from {start_node} to {end_node}. "
+                  "Trying again...")
             return self.sample_two_entities()
         return (start_node, end_node)
+
+    def _update_environment(self, chosen_tail, action):
+        self.current_head = chosen_tail
+        self.path.append(self.current_head)
+        self.relations.append(action)
+        new_state = self.get_state_embedding((self.current_head,
+                                              self.current_target))
+        return new_state
 
     def step(self, action):
         """Takes an action and updates the
@@ -173,23 +204,87 @@ class Env:
                 invalid_path = True
             else:
                 if len(possible_tails) > 1:
-                    possible_tails_without_old_entities = [i for i in possible_tails if i not in self.path]
-                    if len(possible_tails_without_old_entities) == 0:
-                        possible_tails_without_old_entities = possible_tails
-
-                    chosen_tail = random.choice(possible_tails_without_old_entities)
+                    unique_new_tails = [i for i in possible_tails if i not in self.path]
+                    if len(unique_new_tails) > 0:
+                        chosen_tail = random.choice(unique_new_tails)
+                    else:
+                        chosen_tail = random.choice(possible_tails)
                 else:
                     chosen_tail = possible_tails[0]
 
-                self.current_head = chosen_tail
-                self.path.append(self.current_head)
-                new_state = self.get_state_embedding((self.current_head, self.current_target))
+                new_state = self._update_environment(chosen_tail, action)
         return new_state, reward, done, invalid_path
+
+    def compute_shortest_path(self, tails,
+                              exclude_tails_in_episode_path=False):
+        tail_with_shortest_path = None
+        shortest_path = float('inf')
+        for tail in tails:
+            try:
+                path = self.bfs(self.current_head, tail)
+                # To avoid not having any tails
+                # if all of them exist in `self.path`.
+                if tail_with_shortest_path is None:
+                    tail_with_shortest_path = tail
+                    shortest_path = len(path)
+                elif len(path) < shortest_path:
+                    if not exclude_tails_in_episode_path:
+                        tail_with_shortest_path = tail
+                        shortest_path = len(path)
+                    elif exclude_tails_in_episode_path and tail not in self.path:
+                        tail_with_shortest_path = tail
+                        shortest_path = len(path)
+                    else:
+                        continue
+            except NoPathFoundException:
+                continue
+        return tail_with_shortest_path
+
+    def shortest_step(self, action):
+        """Takes an action and updates the
+           environment by taking the shortest
+           possible step and returning a reward and a new states.
+        """
+        tails = [node for node, info in self.graph[self.current_head].items() if info['relation'] == action]
+        reward = 0
+        done = False
+        invalid_path = False
+
+        if self.current_target in tails:
+            done = True
+            reward = 0
+            new_state = None
+            self.path.append(self.current_target)
+            self.relations.append(action)
+
+        if not done:
+            tail_with_shortest_path = self.compute_shortest_path(tails)
+
+            if len(tail_with_shortest_path) == 0:
+                new_state = None
+                reward = -1
+                done = True
+                invalid_path = True
+            else:
+                new_state = self._update_environment(tail_with_shortest_path,
+                                                     action)
+        return new_state, reward, done, invalid_path
+
+    # Still experimental method for
+    # aggregating the path and the relations.
+    def aggregate_path_and_relations(self):
+        aggregated_path = []
+        for idx, relation in enumerate(self.relations):
+            aggregated_path.append((self.path[idx],
+                                    self.path[idx + 1],
+                                    relation))
 
     def generate_episodes(self, entity_1, entity_2, num_paths, verbose=False):
         """Generates episodes by generating paths between two entities.
         """
-        intermediate_paths = self.pick_random_intermediates_between(entity_1, entity_2, num_paths)
+        intermediate_paths = self.pick_random_intermediates_between(entity_1,
+                                                                    entity_2,
+                                                                    num_paths)
         paths = []
         relations = []
         for intermediate_path in intermediate_paths:
@@ -201,8 +296,11 @@ class Env:
                 entity_1_to_current_path.extend(entity_2_to_current_path[1:])
                 paths.append(entity_1_to_current_path)
                 relations.append([self.graph[entity_1_to_current_path[idx]][entity_1_to_current_path[idx+1]]['relation'] for idx in range(len(entity_1_to_current_path)-1)])
-            except Exception:
-                print(f'Could not find a path at intermediate point: {intermediate_path}. Will be skipped.')
+            except NoPathFoundException:
+                print('Could not find a path at '
+                      f'intermediate point: {intermediate_path}. '
+                      'Will be skipped.')
+
         good_episodes = []
         target_id = entity_2
         for path, relation in zip(paths, relations):
@@ -227,8 +325,8 @@ class Env:
         sampled_path = self.sample_two_entities(verbose=verbose)
         self.current_head, self.current_target = sampled_path
         self.initial_head = self.current_head
-        self.path = []
-        self.path.append(self.current_head)
+        self.path = [self.current_head]
+        self.relations = []
         initial_state = self.get_state_embedding(sampled_path)
         return initial_state
 
@@ -238,5 +336,7 @@ class Env:
         self.current_head, self.current_target = entity_1, entity_2
         self.initial_head = self.current_head
         self.path = [self.current_head]
-        initial_state = self.get_state_embedding((self.current_head, self.current_target))
+        self.relations = []
+        initial_state = self.get_state_embedding((self.current_head,
+                                                  self.current_target))
         return initial_state
