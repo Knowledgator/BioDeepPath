@@ -3,6 +3,9 @@ from collections import deque
 
 import networkx as nx
 import torch
+from typing import Any
+from typing import List
+from typing import Tuple
 
 from utils import Transition
 
@@ -22,16 +25,16 @@ class Env:
         self.nodes = list(graph.nodes)
         self.trans_e_model = trans_e_model.to("cpu").eval()
         self.current_head, self.current_tail = None, None
-        self.path = []
-        self.relations = []
+        self.episode_path = []
+        self.episode_relations = []
 
-    def dfs(self, start, end):
+    def compute_dfs(self, start, end):
         """Performs DFS and path tracking."""
         visited = set()
         path = []
         stop_dfs = False
 
-        def _dfs(v):
+        def _compute_dfs(v):
             """Nested function to perform DFS."""
             nonlocal self, end, visited, stop_dfs, path
             path.append(v)
@@ -43,21 +46,32 @@ class Env:
             visited.add(v)
             for x in self.graph[v]:
                 if x not in visited and not stop_dfs and x in self.graph:
-                    return _dfs(x)
+                    return _compute_dfs(x)
 
-        return _dfs(start) or []
+        return _compute_dfs(start) or []
 
-    def bfs(self, start, end, verbose=False):
-        """Performs BFS and path construction."""
+    def compute_bfs(self, start: Any, end: Any, verbose: bool = False) -> List:
+        """Performs BFS and path construction.
+
+        Args:
+            start: The starting node to compute the BFS from.
+            end: The ending node to compute the BFS to.
+            verbose: Whether to print out the BFS results or not.
+
+        Returns:
+            path (List): List of nodes from the starting node to
+                         the ending node.
+        """
+
         # key: child node, value: parent node
         # To keep track of each node and its parent
         # to be used later to construct
         # the path from the start to target entities.
         path = {start: None}
 
-        def _bfs():
+        def _compute_bfs():
             """Nested function for performing BFS."""
-            nonlocal self, start, end, path, verbose
+            nonlocal self, path, start, end, verbose
             visited = set()
 
             # BFS queue
@@ -71,7 +85,7 @@ class Env:
                         path[node] = current_node
                     if node == end:
                         if verbose:
-                            print("FOUND")
+                            print(f"Found end node: {node}.")
                         return
                     visited.add(node)
 
@@ -83,6 +97,7 @@ class Env:
             constructed_path = [end]
             while constructed_path[-1] != start:
                 try:
+                    # Tracing and constructing path.
                     constructed_path.append(path[constructed_path[-1]])
                 except KeyError:
                     raise NoPathFoundException(
@@ -94,43 +109,97 @@ class Env:
             constructed_path.reverse()
             return constructed_path
 
-        _bfs()
+        _compute_bfs()
         constructed_path = _trace_and_construct_path()
         return constructed_path
 
-    def has_path(self, entity_1, entity_2):
+    def has_path(self, entity_1: Any, entity_2: Any) -> bool:
+        """Checks whether the given two entities are connected or not.
+
+        Args:
+            entity_1 (Any): The starting entity to check whether it is
+                            connected to the ending entity or not.
+            entity_2 (Any): The ending entity to check whether it is connected
+                            to the starting entity or not.
+
+        Returns:
+            Boolean: indicating whether the passed entities
+                     are connected or not.
+        """
         try:
-            path = self.bfs(entity_1, entity_2)
+            path = self.compute_bfs(entity_1, entity_2)
             return len(path) > 0
         except NoPathFoundException:
             return False
 
-    def sample_path(self):
+    def sample_two_entities(
+        self, check_nodes_connection: bool = True, verbose: bool = False
+    ) -> bool:
+        """Samples random start and end entities and (optional) ensures that
+        they have paths.
+
+         Args:
+             check_nodes_connection (bool, optional): Whether to check
+                                                      the nodes are
+                                                      connected or not.
+             verbose (bool, optional): Whether to print out
+                                       the results or not.
+         Returns:
+             Boolean: indicating whether the passed entities are
+                      connected or not.
+        """
+        start_node, end_node = random.sample(self.nodes, k=2)
+
+        if verbose:
+            print(f"start node: {start_node} - end node: {end_node}")
+
+        if not check_nodes_connection:
+            return (start_node, end_node)
+
+        if not self.has_path(start_node, end_node):
+            if verbose:
+                print(
+                    f"No path found from {start_node} to {end_node}. "
+                    "Trying again..."
+                )
+            return self.sample_two_entities(check_nodes_connection, verbose)
+        return (start_node, end_node)
+
+    def sample_path(self, verbose: bool = False) -> List:
         """Samples random start and end entities
         and finds the path between them.
+
+        Args:
+            verbose (bool): Whether to print the results or not.
+
+        Returns:
+            List: Path between the sampled start and end entities.
         """
-        start_node = random.choice(self.nodes)
-        end_node = random.choice(list(self.graph.nodes - [start_node]))
-        start_node, end_node = self.sample_two_entities()
-        print(f"start node: {start_node} - end node: {end_node}")
+        start_node, end_node = self.sample_two_entities(False, verbose)
         try:
-            path = self.bfs(start_node, end_node)
+            path = self.compute_bfs(start_node, end_node)
             if len(path) == 0:
                 print(
                     f"No path found from {start_node} to {end_node}. "
                     "Trying again..."
                 )
-                return self.sample_path()
+                return self.sample_path(verbose=verbose)
         except NoPathFoundException:
             print(
                 f"No path found from {start_node} to {end_node}. "
                 "Trying again..."
             )
-            self.sample_path()
+            self.sample_path(verbose=verbose)
         return path
 
-    def get_state_embedding(self, state):
-        """Returns the embedding of the state."""
+    def get_state_embedding(self, state: Tuple) -> torch.Tensor:
+        """Returns the embedding of the state.
+        Args:
+            state (tuple): The state to get the embedding for with length of 2.
+
+        Returns:
+            torch.Tensor: The embedding of the state.
+        """
         current_entity, target_entity = state
         with torch.no_grad():
             current_entity_embed = self.trans_e_model.ent_emb(
@@ -146,7 +215,9 @@ class Env:
         new_state = torch.concatenate(new_state, dim=-1)
         return new_state
 
-    def pick_random_intermediates_between(self, entity1, entity2, num_paths):
+    def pick_random_intermediates_between(
+        self, entity1: Any, entity2: Any, num_paths: int
+    ) -> List:
         """Generate intermediate paths between two entities."""
         intermediate_nodes = set()
         if num_paths > len(self.nodes) - 2:
@@ -167,36 +238,28 @@ class Env:
             intermediate_nodes.add(itermediate)
         return list(intermediate_nodes)
 
-    def sample_two_entities(self, verbose=False):
-        """Samples random start and end entities
-        and ensures that they have paths.
-        """
-        start_node = random.choice(self.nodes)
-        end_node = random.choice(list(self.graph.nodes - [start_node]))
-
-        if verbose:
-            print(f"start node: {start_node} - end node: {end_node}")
-
-        if not self.has_path(start_node, end_node):
-            print(
-                f"No path found from {start_node} to {end_node}. "
-                "Trying again..."
-            )
-            return self.sample_two_entities()
-        return (start_node, end_node)
-
-    def _update_environment(self, chosen_tail, action):
+    def _update_environment(
+        self, chosen_tail: Any, action: int
+    ) -> torch.Tensor:
         self.current_head = chosen_tail
-        self.path.append(self.current_head)
-        self.relations.append(action)
+        self.episode_path.append(self.current_head)
+        self.episode_relations.append(action)
         new_state = self.get_state_embedding(
             (self.current_head, self.current_target)
         )
         return new_state
 
-    def step(self, action):
+    def step(self, action: int) -> Tuple:
         """Takes an action and updates the
         environment by returning a reward and a new state.
+
+        Args:
+            action (int): action to be performed in the
+                          current environment.
+
+        Returns:
+            Tuple: returns a new state, reward, done,
+                   indicator if the latest path was correct or not.
         """
         tails = [
             node
@@ -211,7 +274,7 @@ class Env:
             done = True
             reward = 0
             new_state = None
-            self.path.append(self.current_target)
+            self.episode_path.append(self.current_target)
 
         if not done:
             possible_tails = []
@@ -227,7 +290,7 @@ class Env:
             else:
                 if len(possible_tails) > 1:
                     unique_new_tails = [
-                        i for i in possible_tails if i not in self.path
+                        i for i in possible_tails if i not in self.episode_path
                     ]
                     if len(unique_new_tails) > 0:
                         chosen_tail = random.choice(unique_new_tails)
@@ -240,15 +303,32 @@ class Env:
         return new_state, reward, done, invalid_path
 
     def compute_shortest_path(
-        self, tails, exclude_tails_in_episode_path=False
-    ):
+        self, tails: List, exclude_tails_in_episode_path: bool = False
+    ) -> Any:
+        """Computes the shortest path between a given list of tails and
+           the current target entity.
+
+        Args:
+            tails (List): a list of tails to compute the shortest path to
+                          the current target entity.
+            exclude_tails_in_episode_path (bool, optional): Whether to exclude
+                                                            tails that exists
+                                                            in the current
+                                                            episode path
+                                                            (`episode_path`)
+                                                            or not.
+                                                            Defaults to False.
+
+        Returns:
+            Any: The tail that has the shortest path to the target entity.
+        """
         tail_with_shortest_path = None
         shortest_path = float("inf")
         for tail in tails:
             try:
-                path = self.bfs(self.current_head, tail)
+                path = self.compute_bfs(self.current_head, tail)
                 # To avoid not having any tails
-                # if all of them exist in `self.path`.
+                # if all of them exist in `self.episode_path`.
                 if tail_with_shortest_path is None:
                     tail_with_shortest_path = tail
                     shortest_path = len(path)
@@ -257,7 +337,8 @@ class Env:
                         tail_with_shortest_path = tail
                         shortest_path = len(path)
                     elif (
-                        exclude_tails_in_episode_path and tail not in self.path
+                        exclude_tails_in_episode_path
+                        and tail not in self.episode_path
                     ):
                         tail_with_shortest_path = tail
                         shortest_path = len(path)
@@ -267,10 +348,17 @@ class Env:
                 continue
         return tail_with_shortest_path
 
-    def shortest_step(self, action):
+    def shortest_step(self, action: int) -> Tuple:
         """Takes an action and updates the
         environment by taking the shortest
         possible step and returning a reward and a new states.
+
+        Args:
+            action (int): action to be performed
+                          in the current environment.
+        Returns:
+            Tuple: returns a new state, reward, done,
+                   indicator if the latest path was correct or not.
         """
         tails = [
             node
@@ -285,8 +373,8 @@ class Env:
             done = True
             reward = 0
             new_state = None
-            self.path.append(self.current_target)
-            self.relations.append(action)
+            self.episode_path.append(self.current_target)
+            self.episode_relations.append(action)
 
         if not done:
             tail_with_shortest_path = self.compute_shortest_path(tails)
@@ -306,13 +394,31 @@ class Env:
     # aggregating the path and the relations.
     def aggregate_path_and_relations(self):
         aggregated_path = []
-        for idx, relation in enumerate(self.relations):
+        for idx, relation in enumerate(self.episode_relations):
             aggregated_path.append(
-                (self.path[idx], self.path[idx + 1], relation)
+                (self.episode_path[idx], self.episode_path[idx + 1], relation)
             )
 
-    def generate_episodes(self, entity_1, entity_2, num_paths, verbose=False):
-        """Generates episodes by generating paths between two entities."""
+    def generate_episodes(
+        self,
+        entity_1: Any,
+        entity_2: Any,
+        num_paths: int,
+        verbose: bool = False,
+    ) -> List[List[Transition]]:
+        """Generates episodes by generating paths between two entities.
+        Args:
+            entity_1: The first entity to generate paths from.
+            entity_2: The second entity to generate paths to.
+            num_paths: The number of paths to generate between
+                       the two entities.
+            verbose: Whether to print out the results or not.
+
+        Returns:
+            List[List[Transition]]: List of episode and each episode list
+                                    contains a list of transitions between
+                                    the two entities.
+        """
         intermediate_paths = self.pick_random_intermediates_between(
             entity_1, entity_2, num_paths
         )
@@ -320,10 +426,10 @@ class Env:
         relations = []
         for intermediate_path in intermediate_paths:
             try:
-                entity_1_to_current_path = self.bfs(
+                entity_1_to_current_path = self.compute_bfs(
                     entity_1, intermediate_path, verbose
                 )
-                entity_2_to_current_path = self.bfs(
+                entity_2_to_current_path = self.compute_bfs(
                     intermediate_path, entity_2, verbose
                 )
                 entity_1_to_current_path.extend(entity_2_to_current_path[1:])
@@ -364,22 +470,37 @@ class Env:
             good_episodes.append(good_episode)
         return good_episodes
 
-    def reset(self, verbose=False):
-        """Returns initial state."""
-        sampled_path = self.sample_two_entities(verbose=verbose)
+    def reset(self, verbose: bool = False) -> torch.Tensor:
+        """Returns initial state.
+            Args:
+                verbose (bool): Whether to print any results or not.
+
+            Returns:
+                torch.Tensor: Initial state vector.
+        """
+        sampled_path = self.sample_two_entities(
+            check_nodes_connection=True, verbose=verbose
+        )
         self.current_head, self.current_target = sampled_path
         self.initial_head = self.current_head
-        self.path = [self.current_head]
-        self.relations = []
+        self.episode_path = [self.current_head]
+        self.episode_relations = []
         initial_state = self.get_state_embedding(sampled_path)
         return initial_state
 
-    def reset_from(self, entity_1, entity_2):
-        """Returns initial state."""
+    def reset_from(self, entity_1: Any, entity_2: Any) -> torch.Tensor:
+        """Returns initial state.
+            Args:
+                entity_1 (Any): The first entity to start from.
+                entity_2 (Any): The second entity to end at.
+
+            Returns:
+                torch.Tensor: Initial state vector.
+        """
         self.current_head, self.current_target = entity_1, entity_2
         self.initial_head = self.current_head
-        self.path = [self.current_head]
-        self.relations = []
+        self.episode_path = [self.current_head]
+        self.episode_relations = []
         initial_state = self.get_state_embedding(
             (self.current_head, self.current_target)
         )
