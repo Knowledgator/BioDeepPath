@@ -287,7 +287,7 @@ if __name__ == "__main__":
     args = read_config_file("config.yaml")
 
     print("Args:", args)
-    kg_train = pykeen_to_torchkge_dataset(args.kg_dataset)
+    kg_train = pykeen_to_torchkge_dataset(args.kg_dataset, max_num_examples=args.max_num_examples)
 
     if args.train_transE:
         print("Training TransE Model...")

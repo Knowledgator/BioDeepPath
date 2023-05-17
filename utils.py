@@ -199,7 +199,7 @@ def construct_graph(ds):
     return G
 
 
-def pykeen_to_torchkge_dataset(identifier, split="training", *args, **kwargs):
+def pykeen_to_torchkge_dataset(identifier, split="training", max_num_examples=-1, *args, **kwargs):
     if pykeen_datasets is None:
         raise ImportError(
             "In order to use a dataset from `pykeen` you need to "
@@ -211,7 +211,14 @@ def pykeen_to_torchkge_dataset(identifier, split="training", *args, **kwargs):
 
     dataset = dataset(*args, **kwargs)
     splitted_dataset = getattr(dataset, split)
-    triples = splitted_dataset.triples
+    if max_num_examples == -1:
+        triples = splitted_dataset.triples
+    elif max_num_examples > 0:
+        triples = splitted_dataset.triples[:max_num_examples, :]
+    else:
+        raise ValueError('Expected `max_num_examples` to be equal to -1 or '
+                         f'bigger than zero. Recieved: {max_num_examples}')
+
     print("Creating DataFrame...")
     df = pd.DataFrame(
         {
