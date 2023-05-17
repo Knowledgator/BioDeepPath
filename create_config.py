@@ -20,12 +20,13 @@ def create_config_dict():
         num_episods=2000,
         device='cuda:0',
         task='supervised',
-        kg_dataset=None,
+        kg_dataset='OpenBioLink',
         train_transE=True,
         save_weights_path='weights',
         normalize_transE_weights=True,
         num_generated_episodes=20,
         num_supervised_epochs=2,
+        max_num_examples=-1,
     ))
 
     return config_dict
