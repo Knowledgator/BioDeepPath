@@ -60,10 +60,10 @@ def train_supervised(
     device: str = "cuda",
     save_dir: Optional[str] = None,
 ):
+    train_dl = data.DataLoader(train_ds, batch_size=1, shuffle=True)
+    
     for i in range(1, num_epochs + 1):
         running_loss = 0
-
-        train_dl = data.DataLoader(train_ds, batch_size=1, shuffle=True)
         with tqdm(train_dl, total=max_supervised_steps) as iterator:
             for step, batch in enumerate(iterator):
                 h, t, _ = int(batch[0][0]), int(batch[1][0]), int(batch[2][0])
