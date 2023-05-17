@@ -24,6 +24,7 @@ def create_config_dict():
         train_transE=True,
         save_weights_path='weights',
         normalize_transE_weights=True,
+        num_generated_episodes=20,
         num_supervised_epochs=2,
     ))
 

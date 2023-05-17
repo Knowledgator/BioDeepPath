@@ -54,6 +54,7 @@ def train_supervised(
     env: Env,
     train_ds: data.Dataset,
     num_epochs: int,
+    num_generated_episodes: int,
     device: str = "cuda",
     save_dir: Optional[str] = None,
 ):
@@ -64,7 +65,7 @@ def train_supervised(
         with tqdm(train_dl) as iterator:
             for batch in iterator:
                 h, t, _ = int(batch[0][0]), int(batch[1][0]), int(batch[2][0])
-                episodes = env.generate_episodes(h, t, 10)
+                episodes = env.generate_episodes(h, t, num_generated_episodes)
                 for episode in episodes:
                     state_batch = []
                     action_batch = []
@@ -317,6 +318,7 @@ if __name__ == "__main__":
             env=env,
             train_ds=kg_train,
             num_epochs=args.num_supervised_epochs,
+            num_generated_episodes=args.num_generated_episodes
             device=args.device,
             save_dir=args.save_weights_path,
         )
