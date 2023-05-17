@@ -211,11 +211,12 @@ def pykeen_to_torchkge_dataset(identifier, split="training", *args, **kwargs):
 
     dataset = dataset(*args, **kwargs)
     splitted_dataset = getattr(dataset, split)
+    triples = splitted_dataset.triples
     df = pd.DataFrame(
         {
-            "from": splitted_dataset.triples[:, 0],
-            "to": splitted_dataset.triples[:, 2],
-            "rel": splitted_dataset.triples[:, 1],
+            "from": triples[:, 0],
+            "to": triples[:, 2],
+            "rel": triples[:, 1],
         }
     )
     kg = KnowledgeGraph(
