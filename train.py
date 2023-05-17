@@ -56,6 +56,7 @@ def train_supervised(
     train_ds: data.Dataset,
     num_epochs: int,
     num_generated_episodes: int,
+    max_supervised_steps: int,
     device: str = "cuda",
     save_dir: Optional[str] = None,
 ):
@@ -63,8 +64,8 @@ def train_supervised(
         running_loss = 0
 
         train_dl = data.DataLoader(train_ds, batch_size=1, shuffle=True)
-        with tqdm(train_dl) as iterator:
-            for batch in iterator:
+        with tqdm(train_dl, total=max_supervised_steps) as iterator:
+            for step, batch in enumerate(iterator):
                 h, t, _ = int(batch[0][0]), int(batch[1][0]), int(batch[2][0])
                 episodes = env.generate_episodes(h, t, num_generated_episodes)
                 for episode in episodes:
@@ -85,6 +86,8 @@ def train_supervised(
                     f"Epoch: {i}/{num_epochs} - "
                     f"Loss: {running_loss / len(train_dl)}"
                 )
+                if step == max_supervised_steps:
+                    break
 
         if save_dir is not None:
             weights_dir = os.path.join(
@@ -320,6 +323,7 @@ if __name__ == "__main__":
             train_ds=kg_train,
             num_epochs=args.num_supervised_epochs,
             num_generated_episodes=args.num_generated_episodes,
+            max_supervised_steps=args.max_supervised_steps,
             device=args.device,
             save_dir=args.save_weights_path,
         )

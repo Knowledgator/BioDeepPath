@@ -27,6 +27,8 @@ def create_config_dict():
         num_generated_episodes=20,
         num_supervised_epochs=2,
         max_num_examples=-1,
+        max_supervised_steps=1000000
+
     ))
 
     return config_dict
