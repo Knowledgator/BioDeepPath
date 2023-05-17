@@ -318,7 +318,7 @@ if __name__ == "__main__":
             env=env,
             train_ds=kg_train,
             num_epochs=args.num_supervised_epochs,
-            num_generated_episodes=args.num_generated_episodes
+            num_generated_episodes=args.num_generated_episodes,
             device=args.device,
             save_dir=args.save_weights_path,
         )
