@@ -12,7 +12,7 @@ from torchkge import TransEModel
 from tqdm.auto import tqdm
 
 from environment import Env
-from networks import PolicyNNV2
+from networks import PolicyNNV2, PolicyNNV3
 from utils import Transition, construct_graph, pykeen_to_torchkge_dataset
 from transE_training import train_transE_model
 from typing import Optional
@@ -288,6 +288,7 @@ if __name__ == "__main__":
     kg_train = pykeen_to_torchkge_dataset(args.kg_dataset)
 
     if args.train_transE:
+        print("Training TransE Model...")
         model = train_transE_model(
             kg_train,
             normalize_after_training=args.normalize_transE_weights,
@@ -301,8 +302,10 @@ if __name__ == "__main__":
         )
         model.load_state_dict(torch.load(os.path.join(args.save_weights_path,
                                                       'trans_e_model_weights.pt')))
+        print("TransE weights loaded.")
 
         if args.normalize_transE_weights:
+            print('TransE weights normalized.')
             model.normalize_parameters()
 
     knowledge_graph = construct_graph(kg_train)
