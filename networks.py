@@ -2,7 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+device = (
+    torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+)
 
 
 class MLP(nn.Module):
@@ -20,11 +22,15 @@ class MLP(nn.Module):
     def train(self, training_features, train_labels):
         for epoch in range(self.n_epochs):
             order = torch.randperm(len(training_features))
-            for start_index in range(0, len(training_features), self.batch_size):
+            for start_index in range(
+                0, len(training_features), self.batch_size
+            ):
                 self.optimizer.zero_grad()
-
-                batch_indexes = order[start_index : start_index + self.batch_size]
-
+                # fmt: off
+                batch_indexes = order[
+                    start_index: start_index + self.batch_size
+                ]
+                # fmt: on
                 X_batch = training_features[batch_indexes].to(device)
                 y_batch = train_labels[batch_indexes].to(device)
 
@@ -38,7 +44,7 @@ class MLP(nn.Module):
 
 class PolicyNNV2(nn.Module):
     def __init__(self, state_dim, action_dim):
-        super(PolicyNN, self).__init__()
+        super(PolicyNNV2, self).__init__()
         self.fc1 = nn.Linear(state_dim, 512, bias=True)
         self.layernorm_1 = nn.LayerNorm(512)
         self.fc2 = nn.Linear(512, 1024, bias=True)

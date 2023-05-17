@@ -8,14 +8,24 @@ import numpy as np
 from BFS.BFS import BFS
 from BFS.KB import KB
 
-Transition = namedtuple("Transition",
-                        ("state", "action", "next_state", "reward"))
+try:
+    from pykeen import datasets as pykeen_datasets
+except ImportError:
+    pykeen_datasets = None
+
+from torchkge.data_structures import KnowledgeGraph
+import pandas as pd
+
+
+Transition = namedtuple(
+    "Transition", ("state", "action", "next_state", "reward")
+)
 
 
 class Kids:
     def __init__(self, dataPath):
-        f1 = open(dataPath + 'entities.tsv')
-        f2 = open(dataPath + 'relations.tsv')
+        f1 = open(dataPath + "entities.tsv")
+        f2 = open(dataPath + "relations.tsv")
         self.entity2id = f1.readlines()
         self.relation2id = f2.readlines()
         f1.close()
@@ -31,10 +41,10 @@ class Kids:
             line = line.split()
             self.relation2id_[line[1]] = int(line[0])
             self.relations.append(line[1])
-        self.id2entity = {v:k for k,v in self.entity2id_.items()}
-        self.id2relation = {v:k for k,v in self.relation2id_.items()}
-        self.entity2vec = np.loadtxt(dataPath + 'entity2vec.bern')
-        self.relation2vec = np.loadtxt(dataPath + 'relation2vec.bern')
+        self.id2entity = {v: k for k, v in self.entity2id_.items()}
+        self.id2relation = {v: k for k, v in self.relation2id_.items()}
+        self.entity2vec = np.loadtxt(dataPath + "entity2vec.bern")
+        self.relation2vec = np.loadtxt(dataPath + "relation2vec.bern")
 
 
 def distance(e1, e2):
@@ -55,7 +65,7 @@ def create_kb(graphpath):
         s = line.split()[0]
         t = line.split()[2]
         if s not in kb:
-            kb[s] = {r:{t}}
+            kb[s] = {r: {t}}
         elif r not in kb[s]:
             kb[s][r] = {t}
         else:
@@ -81,7 +91,7 @@ def teacher(e1, e2, num_paths, env, path=None):
         if suc1 and suc2:
             res_entity_lists.append(entity_list1 + entity_list2[1:])
             res_path_lists.append(path_list1 + path_list2)
-    print('BFS found paths:', len(res_path_lists))
+    print("BFS found paths:", len(res_path_lists))
 
     # ---------- clean the path --------
     res_entity_lists_new = []
@@ -131,14 +141,19 @@ def teacher(e1, e2, num_paths, env, path=None):
             state_next = [nextID, targetID, 0]
             actionID = env.kids.relation2id_[path[1][i]]
             good_episode.append(
-                Transition(state=env.idx_state(state_curr), action=actionID, next_state=env.idx_state(state_next),
-                           reward=1))
+                Transition(
+                    state=env.idx_state(state_curr),
+                    action=actionID,
+                    next_state=env.idx_state(state_next),
+                    reward=1,
+                )
+            )
         good_episodes.append(good_episode)
     return good_episodes
 
 
 def path_clean(path):
-    rel_ents = path.split(' -> ')
+    rel_ents = path.split(" -> ")
     relations = []
     entities = []
     for idx, item in enumerate(rel_ents):
@@ -157,7 +172,7 @@ def path_clean(path):
             max_idx = max(ent_idx)
             if min_idx != max_idx:
                 rel_ents = rel_ents[:min_idx] + rel_ents[max_idx:]
-    return ' -> '.join(rel_ents)
+    return " -> ".join(rel_ents)
 
 
 def prob_norm(probs):
@@ -180,5 +195,32 @@ def construct_graph(ds):
     for h, t, r in ds:
         G.add_edge(h, t)
         attrs[(h, t)] = r
-    nx.set_edge_attributes(G, attrs, 'relation')
+    nx.set_edge_attributes(G, attrs, "relation")
     return G
+
+
+def pykeen_to_torchkge_dataset(identifier, split="training", *args, **kwargs):
+    if pykeen_datasets is None:
+        raise ImportError(
+            "In order to use a dataset from `pykeen` you need to "
+            "install `pykeen` using `pip install pykeen`."
+        )
+    dataset = getattr(pykeen_datasets, identifier, None)
+    if dataset is None:
+        raise ValueError(f"Dataset not found. Recieved: {identifier}.")
+
+    dataset = dataset(*args, **kwargs)
+    splitted_dataset = getattr(dataset, split)
+    df = pd.DataFrame(
+        {
+            "from": splitted_dataset.triples[:, 0],
+            "to": splitted_dataset.triples[:, 2],
+            "rel": splitted_dataset.triples[:, 1],
+        }
+    )
+    kg = KnowledgeGraph(
+        df=df,
+        ent2ix=splitted_dataset.entity_to_id,
+        rel2ix=splitted_dataset.relation_to_id,
+    )
+    return kg

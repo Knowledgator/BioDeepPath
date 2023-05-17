@@ -9,12 +9,12 @@ from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils import data
 from torchkge import TransEModel
-from torchkge.utils import load_fb15k
 from tqdm.auto import tqdm
 
 from environment import Env
 from networks import PolicyNNV2
-from utils import Transition, construct_graph
+from utils import Transition, construct_graph, pykeen_to_torchkge_dataset
+from transE_training import train_transE_model
 
 seed = 7
 torch.manual_seed(seed)
@@ -35,18 +35,16 @@ class PolicyNetwork(nn.Module):
         action_prob = self.policy_nn(state)
         return action_prob
 
-    def compute_loss(self, action_prob, action):
-        # TODO: Add regularization loss
+    def compute_loss(self, action_prob, action, eps=1e-9):
         action_mask = F.one_hot(action, num_classes=self.action_space) > 0
         picked_action_prob = action_prob[action_mask]
-        loss = torch.sum(-torch.log(picked_action_prob))
+        loss = torch.sum(-torch.log(picked_action_prob + eps))
         return loss
 
-    def compute_loss_rl(self, action_prob, target, action):
-        # TODO: Add regularization loss
+    def compute_loss_rl(self, action_prob, target, action, eps=1e-9):
         action_mask = F.one_hot(action, num_classes=self.action_space) > 0
         picked_action_prob = action_prob[action_mask]
-        loss = torch.sum(-torch.log(picked_action_prob) * target)
+        loss = torch.sum(-torch.log(picked_action_prob + eps) * target)
         return loss
 
 
@@ -74,32 +72,40 @@ def train_supervised(policy_model, env, train_ds, num_epochs, device="cuda"):
                     policy_model.optimizer.step()
                     running_loss += loss.item()
                 iterator.set_description(
-                    f"Epoch: {i}/{num_epochs} - Loss: {running_loss / len(train_dl)}"
+                    f"Epoch: {i}/{num_epochs} - "
+                    f"Loss: {running_loss / len(train_dl)}"
                 )
 
         torch.save(
-            policy_model.state_dict(), f"policy_model_weights_supervised_{i}.pt"
+            policy_model.state_dict(),
+            f"policy_sl_phase_weights_epoch_{i}.pt",
         )
         torch.save(
             policy_model.optimizer.state_dict(),
-            f"policy_optimizer_supervised_{i}.pt",
+            f"policy_sl_phase_optimizer_epoch_{i}.pt",
         )
     return policy_model
 
 
-def train_rl(policy_model: PolicyNetwork, env: Env, train_ds: data.Dataset,
-             num_episodes: int, max_steps: int,
-             action_space: int, device: str = 'cuda'):
+def train_rl(
+    policy_model: PolicyNetwork,
+    env: Env,
+    train_ds: data.Dataset,
+    num_episodes: int,
+    max_steps: int,
+    action_space: int,
+    device: str = "cuda",
+):
     done = False
     success = 0
     invalid_path = False
     policy_model = policy_model.train()
     sampled_indices = set()
-    for episode in range(1, num_episodes+1):        
+    for episode in range(1, num_episodes + 1):
         state_batch_negative = []
         action_batch_negative = []
         episodes = []
-        episode_path = ''
+        episode_path = ""
 
         sampled_idx = random.choice(range(len(train_ds)))
         while sampled_idx in sampled_indices:
@@ -108,44 +114,54 @@ def train_rl(policy_model: PolicyNetwork, env: Env, train_ds: data.Dataset,
         sampled_indices.add(sampled_idx)
         entity_1, entity_2 = train_ds[sampled_idx][:-1]
         current_state = env.reset_from(entity_1, entity_2)
-        print(f"Episode: {episode} - Current Start: {env.current_head} - Current End: {env.current_target}")
+        print(
+            f"Episode: {episode} - Current Start: {env.current_head} - Current End: {env.current_target}"  # noqa
+        )
         for step in count(1):
-            episode_path += f'{env.current_head} -> '
+            episode_path += f"{env.current_head} -> "
             action_probs = policy_model(current_state.to(device))
-            chosen_relation = np.random.choice(np.arange(action_space),
-                                               p=np.squeeze(action_probs.cpu().detach().numpy()))
+            chosen_relation = np.random.choice(
+                np.arange(action_space),
+                p=np.squeeze(action_probs.cpu().detach().numpy()),
+            )
             next_state, reward, done, invalid_path = env.step(chosen_relation)
 
             if reward == -1:
                 state_batch_negative.append(current_state)
                 action_batch_negative.append(chosen_relation)
 
-            episodes.append(Transition(state=current_state,
-                                       action=chosen_relation,
-                                       next_state=next_state, reward=reward))
+            episodes.append(
+                Transition(
+                    state=current_state,
+                    action=chosen_relation,
+                    next_state=next_state,
+                    reward=reward,
+                )
+            )
             if done or step == max_steps:
-                episode_path += f'{env.current_target}'
-                print('Episode Path:', episode_path)
+                episode_path += f"{env.current_target}"
+                print("Episode Path:", episode_path)
                 break
 
             current_state = next_state
 
         if len(state_batch_negative) != 0:
-            print('Penalty to invalid steps:', len(state_batch_negative))
+            print("Penalty to invalid steps:", len(state_batch_negative))
             state_batch_negative = torch.cat(state_batch_negative).to(device)
-            action_batch_negative = torch.tensor(action_batch_negative,
-                                                 dtype=torch.long,
-                                                 device=device)
+            action_batch_negative = torch.tensor(
+                action_batch_negative, dtype=torch.long, device=device
+            )
             policy_model.optimizer.zero_grad()
             predictions = policy_model(state_batch_negative)
-            loss = policy_model.compute_loss_rl(predictions, -0.05,
-                                                action_batch_negative)
+            loss = policy_model.compute_loss_rl(
+                predictions, -0.05, action_batch_negative
+            )
             loss.backward()
             policy_model.optimizer.step()
 
         # If the agent success, do one optimization
         if not invalid_path:
-            print('Success')
+            print("Success")
 
             success += 1
             path_length = len(env.path)
@@ -159,12 +175,14 @@ def train_rl(policy_model: PolicyNetwork, env: Env, train_ds: data.Dataset,
                     state_batch.append(transition.state)
                     action_batch.append(transition.action)
             state_batch = torch.cat(state_batch).to(device)
-            action_batch = torch.tensor(action_batch, device=device,
-                                        dtype=torch.long)
+            action_batch = torch.tensor(
+                action_batch, device=device, dtype=torch.long
+            )
             policy_model.optimizer.zero_grad()
             predictions = policy_model(state_batch)
-            loss = policy_model.compute_loss_rl(predictions, total_reward,
-                                                action_batch)
+            loss = policy_model.compute_loss_rl(
+                predictions, total_reward, action_batch
+            )
             loss.backward()
             policy_model.optimizer.step()
         else:
@@ -179,18 +197,21 @@ def train_rl(policy_model: PolicyNetwork, env: Env, train_ds: data.Dataset,
             if len(state_batch) == 0:
                 continue
             state_batch = torch.cat(state_batch).to(device)
-            action_batch = torch.tensor(action_batch, device=device,
-                                        dtype=torch.long)
+            action_batch = torch.tensor(
+                action_batch, device=device, dtype=torch.long
+            )
             policy_model.optimizer.zero_grad()
             predictions = policy_model(state_batch)
-            loss = policy_model.compute_loss_rl(predictions, total_reward,
-                                                action_batch)
+            loss = policy_model.compute_loss_rl(
+                predictions, total_reward, action_batch
+            )
             loss.backward()
             policy_model.optimizer.step()
 
-            print('Failed, Do one teacher guideline')
-            good_episodes = env.generate_episodes(env.initial_head,
-                                                  env.current_target, 1)
+            print("Failed, Do one teacher guideline")
+            good_episodes = env.generate_episodes(
+                env.initial_head, env.current_target, 1
+            )
             for item in good_episodes:
                 teacher_state_batch = []
                 teacher_action_batch = []
@@ -199,49 +220,80 @@ def train_rl(policy_model: PolicyNetwork, env: Env, train_ds: data.Dataset,
                     teacher_state_batch.append(transition.state)
                     teacher_action_batch.append(transition.action)
 
-                teacher_state_batch = torch.cat(teacher_state_batch).squeeze().to(device=device, dtype=torch.float32)
-                teacher_action_batch = torch.tensor(teacher_action_batch).to(device=device, dtype=torch.long)
+                teacher_state_batch = (
+                    torch.cat(teacher_state_batch)
+                    .squeeze()
+                    .to(device=device, dtype=torch.float32)
+                )
+                teacher_action_batch = torch.tensor(teacher_action_batch).to(
+                    device=device, dtype=torch.long
+                )
                 policy_model.optimizer.zero_grad()
                 predictions = policy_model(teacher_state_batch)
-                loss = policy_model.compute_loss_rl(predictions, 1,
-                                                    teacher_action_batch)
+                loss = policy_model.compute_loss_rl(
+                    predictions, 1, teacher_action_batch
+                )
                 loss.backward()
                 policy_model.optimizer.step()
 
-    torch.save(policy_model.state_dict(), 'policy_rl_weights_v3.pt')
-    torch.save(policy_model.optimizer.state_dict(), 'policy_optimizer_rl_v3.pt')
+    torch.save(policy_model.state_dict(), "policy_rl_phase_weights.pt")
+    torch.save(
+        policy_model.optimizer.state_dict(), "policy_rl_phase_optimizer.pt"
+    )
     return policy_model
 
 
 def read_config_file(config_file_name):
     if not os.path.exists(config_file_name):
-        raise FileNotFoundError(f'{config_file_name} does not exist. '
-                                'please call `create_config.py` first '
-                                'using `python create_config.py`.')
+        raise FileNotFoundError(
+            f"{config_file_name} does not exist. "
+            "please call `create_config.py` first "
+            "using `python create_config.py`."
+        )
 
-    with open(config_file_name, 'r') as f:
+    with open(config_file_name, "r") as f:
         config = yaml.load(f, yaml.UnsafeLoader)
     return config
 
 
-
 if __name__ == "__main__":
-    args = read_config_file('config.yaml')
-    kg_train, _, _ = load_fb15k()
-    model = TransEModel(
-        args.transE_embed_dim,
-        kg_train.n_ent,
-        kg_train.n_rel,
-        dissimilarity_type="L2",
-    )
-    G = construct_graph(kg_train)
-    env = Env(G, model)
-    policy = PolicyNetwork(args.state_dim, args.action_space).to(args.device)
-    if args.task == 'supervised':
-        train_supervised(policy, env, kg_train, 2)
-    elif args.task == 'rl':
-        train_rl(policy, env, kg_train, args.num_episods, args.max_steps,
-                 args.action_space)
+    args = read_config_file("config.yaml")
+
+    kg_train = pykeen_to_torchkge_dataset(args.kg_dataset)
+
+    if args.train_transE:
+        model = train_transE_model(
+            kg_train,
+            normalize_after_training=args.normalize_transE_weights,
+            save_dir=args.transE_weights_path
+        )
     else:
-        raise ValueError('Unknown task, expected `supervised` or `rl` task. '
-                         f'Recieved: {args.task}.')
+        model = TransEModel(
+            emb_dim=args.transE_embed_dim,
+            n_entities=kg_train.n_ent,
+            n_relations=kg_train.n_rel,
+        )
+        model.load_state_dict(torch.load(args.transE_weights_path))
+
+        if args.normalize_transE_weights:
+            model.normalize_parameters()
+
+    knowledge_graph = construct_graph(kg_train)
+    env = Env(knowledge_graph, model)
+    policy = PolicyNetwork(args.state_dim, args.action_space).to(args.device)
+    if args.task == "supervised":
+        train_supervised(policy, env, kg_train, 2)
+    elif args.task == "rl":
+        train_rl(
+            policy,
+            env,
+            kg_train,
+            args.num_episods,
+            args.max_steps,
+            args.action_space,
+        )
+    else:
+        raise ValueError(
+            "Unknown task, expected `supervised` or `rl` task. "
+            f"Recieved: {args.task}."
+        )

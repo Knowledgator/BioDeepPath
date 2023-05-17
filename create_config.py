@@ -22,6 +22,10 @@ def create_config_dict():
         num_episods=2000,
         device='cuda:0',
         task='supervised',
+        kg_dataset=None,
+        train_transE=True,
+        transE_weights_path=None,
+        normalize_transE_weights=True,
     ))
 
     return config_dict
