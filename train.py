@@ -259,6 +259,7 @@ def read_config_file(config_file_name):
 if __name__ == "__main__":
     args = read_config_file("config.yaml")
 
+    print("Args:", args)
     kg_train = pykeen_to_torchkge_dataset(args.kg_dataset)
 
     if args.train_transE:
