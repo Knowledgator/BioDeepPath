@@ -290,8 +290,8 @@ if __name__ == "__main__":
     if args.train_transE:
         model = train_transE_model(
             kg_train,
-            normalize_after_training=args.save_weights_path,
-            save_dir=args.transE_weights_path,
+            normalize_after_training=args.normalize_transE_weights,
+            save_dir=args.save_weights_path,
         )
     else:
         model = TransEModel(
@@ -299,14 +299,15 @@ if __name__ == "__main__":
             n_entities=kg_train.n_ent,
             n_relations=kg_train.n_rel,
         )
-        model.load_state_dict(torch.load(args.transE_weights_path))
+        model.load_state_dict(torch.load(os.path.join(args.save_weights_path,
+                                                      'trans_e_model_weights.pt')))
 
         if args.normalize_transE_weights:
             model.normalize_parameters()
 
     knowledge_graph = construct_graph(kg_train)
     env = Env(knowledge_graph, model)
-    policy = PolicyNetwork(args.state_dim, args.action_space).to(args.device)
+    policy = PolicyNetwork(args.state_dim, kg_train.n_rel).to(args.device)
     if args.task == "supervised":
         train_supervised(
             policy_model=policy,
@@ -323,7 +324,7 @@ if __name__ == "__main__":
             train_ds=kg_train,
             num_episodes=args.num_episods,
             max_steps=args.max_steps,
-            action_space=args.action_space,
+            action_space=kg_train.n_rel,
             device=args.device,
             save_dir=args.save_weights_path,
         )

@@ -8,13 +8,11 @@ def create_config_dict():
     config_dict = ConfigDict(dict(
         transE_embed_dim=100,
         state_dim=200,
-        action_space=1345,
         eps_start=1,
         eps_end=0.1,
         epe_decay=1000,
         replay_memory_size=10000,
         batch_size=128,
-        embedding_dim=100,
         gamma=0.99,
         target_update_freq=1000,
         max_steps=50,
