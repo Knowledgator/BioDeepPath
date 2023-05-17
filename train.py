@@ -108,58 +108,6 @@ def train_supervised(
     return policy_model
 
 
-def train_supervised_v2(
-    policy_model: PolicyNetwork,
-    env: Env,
-    train_ds: data.Dataset,
-    num_epochs: int,
-    num_generated_episodes: int,
-    device: str = "cuda",
-    save_dir: Optional[str] = None,
-):
-    for i in range(1, num_epochs + 1):
-        running_loss = 0
-
-        train_dl = data.DataLoader(SupervisedLearningDataset(train_ds, env, num_generated_episodes),
-                                   batch_size=10, shuffle=True)
-        with tqdm(train_dl) as iterator:
-            for batch in iterator:
-                states, actions = batch
-                print(states.shape, actions.shape)
-                policy_model.optimizer.zero_grad(set_to_none=True)
-                preds = policy_model(states)
-                loss = policy_model.compute_loss(preds, actions)
-                loss.backward()
-                policy_model.optimizer.step()
-                running_loss += loss.item()
-                iterator.set_description(
-                    f"Epoch: {i}/{num_epochs} - "
-                    f"Loss: {running_loss / len(train_dl)}"
-                )
-
-        if save_dir is not None:
-            weights_dir = os.path.join(
-                save_dir, f"policy_sl_phase_weights_epoch_{i}.pt"
-            )
-            optimizer_dir = os.path.join(
-                save_dir, f"policy_sl_phase_optimizer_epoch_{i}.pt"
-            )
-        else:
-            weights_dir = f"policy_sl_phase_weights_epoch_{i}.pt"
-            optimizer_dir = f"policy_sl_phase_optimizer_epoch_{i}.pt"
-
-        torch.save(
-            policy_model.policy_nn.state_dict(),
-            weights_dir,
-        )
-        torch.save(
-            policy_model.optimizer.state_dict(),
-            optimizer_dir,
-        )
-    return policy_model
-
-
-
 def train_rl(
     policy_model: PolicyNetwork,
     env: Env,
@@ -366,7 +314,7 @@ if __name__ == "__main__":
     env = Env(knowledge_graph, model)
     policy = PolicyNetwork(args.state_dim, kg_train.n_rel).to(args.device)
     if args.task == "supervised":
-        train_supervised_v2(
+        train_supervised(
             policy_model=policy,
             env=env,
             train_ds=kg_train,
