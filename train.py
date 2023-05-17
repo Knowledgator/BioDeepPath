@@ -313,7 +313,7 @@ if __name__ == "__main__":
             policy_model=policy,
             env=env,
             train_ds=kg_train,
-            epochs=args.num_supervised_epochs,
+            num_epochs=args.num_supervised_epochs,
             device=args.device,
             save_dir=args.save_weights_path,
         )
