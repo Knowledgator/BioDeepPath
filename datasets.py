@@ -26,6 +26,6 @@ class SupervisedLearningDataset(data.Dataset):
             for transition in episode:
                 state_batch.append(transition.state)
                 action_batch.append(torch.tensor([transition.action]))
-            state_batch = torch.cat(state_batch, dim=0)
-            action_batch = torch.cat(action_batch, dim=0)
+        state_batch = torch.cat(state_batch, dim=0)
+        action_batch = torch.cat(action_batch, dim=0)
         return state_batch, action_batch
