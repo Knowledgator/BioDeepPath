@@ -24,8 +24,9 @@ def create_config_dict():
         task='supervised',
         kg_dataset=None,
         train_transE=True,
-        transE_weights_path=None,
+        save_weights_path='weights',
         normalize_transE_weights=True,
+        num_supervised_epochs=2,
     ))
 
     return config_dict

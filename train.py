@@ -15,6 +15,7 @@ from environment import Env
 from networks import PolicyNNV2
 from utils import Transition, construct_graph, pykeen_to_torchkge_dataset
 from transE_training import train_transE_model
+from typing import Optional
 
 seed = 7
 torch.manual_seed(seed)
@@ -48,7 +49,14 @@ class PolicyNetwork(nn.Module):
         return loss
 
 
-def train_supervised(policy_model, env, train_ds, num_epochs, device="cuda"):
+def train_supervised(
+    policy_model: PolicyNetwork,
+    env: Env,
+    train_ds: data.Dataset,
+    num_epochs: int,
+    device: str = "cuda",
+    save_dir: Optional[str] = None,
+):
     for i in range(1, num_epochs + 1):
         running_loss = 0
 
@@ -76,13 +84,24 @@ def train_supervised(policy_model, env, train_ds, num_epochs, device="cuda"):
                     f"Loss: {running_loss / len(train_dl)}"
                 )
 
+        if save_dir is not None:
+            weights_dir = os.path.join(
+                save_dir, f"policy_sl_phase_weights_epoch_{i}.pt"
+            )
+            optimizer_dir = os.path.join(
+                save_dir, f"policy_sl_phase_optimizer_epoch_{i}.pt"
+            )
+        else:
+            weights_dir = f"policy_sl_phase_weights_epoch_{i}.pt"
+            optimizer_dir = f"policy_sl_phase_optimizer_epoch_{i}.pt"
+
         torch.save(
-            policy_model.state_dict(),
-            f"policy_sl_phase_weights_epoch_{i}.pt",
+            policy_model.policy_nn.state_dict(),
+            weights_dir,
         )
         torch.save(
             policy_model.optimizer.state_dict(),
-            f"policy_sl_phase_optimizer_epoch_{i}.pt",
+            optimizer_dir,
         )
     return policy_model
 
@@ -95,6 +114,7 @@ def train_rl(
     max_steps: int,
     action_space: int,
     device: str = "cuda",
+    save_dir: Optional[str] = None,
 ):
     done = False
     success = 0
@@ -236,10 +256,15 @@ def train_rl(
                 loss.backward()
                 policy_model.optimizer.step()
 
-    torch.save(policy_model.state_dict(), "policy_rl_phase_weights.pt")
-    torch.save(
-        policy_model.optimizer.state_dict(), "policy_rl_phase_optimizer.pt"
-    )
+    if save_dir is not None:
+        weights_dir = os.path.join(save_dir, "policy_rl_phase_weights.pt")
+        optimizer_dir = os.path.join(save_dir, "policy_rl_phase_optimizer.pt")
+    else:
+        weights_dir = "policy_rl_phase_weights.pt"
+        optimizer_dir = "policy_rl_phase_optimizer.pt"
+
+    torch.save(policy_model.policy_nn.state_dict(), weights_dir)
+    torch.save(policy_model.optimizer.state_dict(), optimizer_dir)
     return policy_model
 
 
@@ -265,8 +290,8 @@ if __name__ == "__main__":
     if args.train_transE:
         model = train_transE_model(
             kg_train,
-            normalize_after_training=args.normalize_transE_weights,
-            save_dir=args.transE_weights_path
+            normalize_after_training=args.save_weights_path,
+            save_dir=args.transE_weights_path,
         )
     else:
         model = TransEModel(
@@ -283,15 +308,24 @@ if __name__ == "__main__":
     env = Env(knowledge_graph, model)
     policy = PolicyNetwork(args.state_dim, args.action_space).to(args.device)
     if args.task == "supervised":
-        train_supervised(policy, env, kg_train, 2)
+        train_supervised(
+            policy_model=policy,
+            env=env,
+            train_ds=kg_train,
+            epochs=args.num_supervised_epochs,
+            device=args.device,
+            save_dir=args.save_weights_path,
+        )
     elif args.task == "rl":
         train_rl(
-            policy,
-            env,
-            kg_train,
-            args.num_episods,
-            args.max_steps,
-            args.action_space,
+            policy_model=policy,
+            env=env,
+            train_ds=kg_train,
+            num_episodes=args.num_episods,
+            max_steps=args.max_steps,
+            action_space=args.action_space,
+            device=args.device,
+            save_dir=args.save_weights_path,
         )
     else:
         raise ValueError(
