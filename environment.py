@@ -228,14 +228,14 @@ class Env:
                 f"num_itermediates: {num_paths}"
             )
         for _ in range(num_paths):
-            itermediate = random.choice(self.nodes)
+            intermediate_node = random.choice(self.nodes)
             while (
-                itermediate in intermediate_nodes
-                or itermediate == entity1
-                or itermediate == entity2
+                intermediate_node in intermediate_nodes
+                or intermediate_node == entity1
+                or intermediate_node == entity2
             ):
-                itermediate = random.choice(self.nodes)
-            intermediate_nodes.add(itermediate)
+                intermediate_node = random.choice(self.nodes)
+            intermediate_nodes.add(intermediate_node)
         return list(intermediate_nodes)
 
     def _update_environment(
