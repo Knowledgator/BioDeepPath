@@ -93,7 +93,7 @@ class PolicyNNV3(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(PolicyNNV3, self).__init__()
         self.block_1 = Block(state_dim, 512)
-        self.residual_fc = nn.Linear(state_dim, 512)
+        self.residual_fc = nn.Linear(state_dim, 1024)
         self.block_2 = Block(512, 1024)
         self.block_3 = Block(1024, 1024)
         self.output_block = OutputBlock(1024, action_dim)
