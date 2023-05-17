@@ -20,9 +20,9 @@ class SupervisedLearningDataset(data.Dataset):
         h, t, _ = self.kg_dataset[idx]
         episodes = self.env.generate_episodes(h, t,
                                               self.num_generated_episodes)
+        state_batch = []
+        action_batch = []
         for episode in episodes:
-            state_batch = []
-            action_batch = []
             for transition in episode:
                 state_batch.append(transition.state)
                 action_batch.append(torch.tensor([transition.action]))
