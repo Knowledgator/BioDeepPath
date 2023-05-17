@@ -64,7 +64,7 @@ def train_supervised(
         with tqdm(train_dl) as iterator:
             for batch in iterator:
                 h, t, _ = int(batch[0][0]), int(batch[1][0]), int(batch[2][0])
-                episodes = env.generate_episodes(h, t, 5)
+                episodes = env.generate_episodes(h, t, 10)
                 for episode in episodes:
                     state_batch = []
                     action_batch = []
