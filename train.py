@@ -61,7 +61,7 @@ def train_supervised(
     save_dir: Optional[str] = None,
 ):
     train_dl = data.DataLoader(train_ds, batch_size=1, shuffle=True)
-    
+
     for i in range(1, num_epochs + 1):
         running_loss = 0
         with tqdm(train_dl, total=max_supervised_steps) as iterator:

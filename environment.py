@@ -227,6 +227,7 @@ class Env:
                 f"num_entities: {len(self.entities)}"
                 f"num_itermediates: {num_paths}"
             )
+        
         for _ in range(num_paths):
             intermediate_node = random.choice(self.nodes)
             while (
@@ -443,11 +444,14 @@ class Env:
                     ]
                 )
             except NoPathFoundException:
-                print(
-                    "Could not find a path at "
-                    f"intermediate point: {intermediate_path}. "
-                    "Will be skipped."
-                )
+                if verbose:
+                    print(
+                        "Could not find a path at "
+                        f"intermediate point: {intermediate_path}. "
+                        "Will be skipped."
+                    )
+                else:
+                    continue
 
         good_episodes = []
         target_id = entity_2
