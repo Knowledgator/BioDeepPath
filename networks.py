@@ -66,6 +66,49 @@ class PolicyNNV2(nn.Module):
         return action_probs
 
 
+class Block(nn.Module):
+    def __init__(self, input_dim, output_dim, dropout_prob=0.25) -> None:
+        super().__init__()
+        self.fc = nn.Linear(input_dim, output_dim, bias=True)
+        self.layernorm = nn.LayerNorm(output_dim)
+        self.dropout = nn.Dropout(dropout_prob)
+
+    def forward(self, inputs):
+        return self.dropout(F.gelu(self.layernorm(self.fc(inputs))))
+
+
+class OutputBlock(nn.Module):
+    def __init__(self, input_dim, action_dim) -> None:
+        super().__init__()
+        self.fc = nn.Linear(1024, action_dim, bias=True)
+        self.activation = nn.Softmax(dim=-1)
+
+
+    def forward(self, inputs):
+        return self.activation(self.fc(inputs))
+
+
+
+class PolicyNNV3(nn.Module):
+    def __init__(self, state_dim, action_dim):
+        super(PolicyNNV3, self).__init__()
+        self.block_1 = Block(state_dim, 512)
+        self.residual_fc = nn.Linear(state_dim, 512)
+        self.block_2 = Block(512, 1024)
+        self.block_3 = Block(1024, 1024)
+        self.output_block = OutputBlock(1024, action_dim)
+
+    def forward(self, state):
+        y = self.block_1(state)
+        residual = self.residual_fc(state)
+        y = self.block_2(y)
+        y = self.block_3(y)
+        y += residual
+
+        action_probs = self.output_block(y)
+        return action_probs
+
+
 class PolicyNN(nn.Module):
     def __init__(self, state_dim, action_dim, initializer=None):
         super(PolicyNN, self).__init__()
