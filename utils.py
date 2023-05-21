@@ -362,6 +362,7 @@ def _from_txt_file_to_dataframe_and_tokenizer(
 
         df_train.to_csv("training_set.csv", index=False)
         df_test.to_csv("testing_set.csv", index=False)
+        tokenizer.to_json()
         return df_train, tokenizer
 
 
