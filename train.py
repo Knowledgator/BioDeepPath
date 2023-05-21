@@ -85,7 +85,7 @@ def train_supervised(
                 iterator.set_description(
                     f"Epoch: {i}/{num_epochs} - "
                     f"Loss: {running_loss / len(train_dl)} - "
-                    f"Not found episodes: {len(episodes)}/{num_generated_episodes}"
+                    f"Found episodes: {len(episodes)}/{num_generated_episodes}"
                 )
 
                 if max_supervised_steps != -1 and step == max_supervised_steps:
