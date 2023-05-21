@@ -189,7 +189,7 @@ def train_rl(
             print("Success")
 
             success += 1
-            path_length = len(env.path)
+            path_length = len(env.episode_path)
             length_reward = 1 / path_length
             global_reward = 1
             total_reward = 0.1 * global_reward + 0.9 * length_reward
