@@ -333,6 +333,6 @@ def from_txt_to_dataset(
     )
 
     dataset = KnowledgeGraph(
-        df, ent2ix=tokenizer.entity_to_id, rel2ix=tokenizer.relation_to_id
+        df, ent2ix=dict(tokenizer.entity_to_id), rel2ix=dict(tokenizer.relation_to_id)
     )
     return dataset
