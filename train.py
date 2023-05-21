@@ -74,8 +74,6 @@ def train_supervised(
                     for transition in episode:
                         state_batch.append(transition.state)
                         action_batch.append(torch.tensor([transition.action]))
-                    if len(state_batch) == 0 and len(action_batch) == 0:
-                        continue
                     state_batch = torch.cat(state_batch, dim=0).to(device)
                     action_batch = torch.cat(action_batch, dim=0).to(device)
                     policy_model.optimizer.zero_grad(set_to_none=True)
