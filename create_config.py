@@ -20,7 +20,7 @@ def create_config_dict():
         num_episods=2000,
         device='cuda:0',
         task='supervised',
-        kg_dataset='OpenBioLink',
+        kg_dataset=None,
         train_transE=True,
         save_weights_path='weights',
         normalize_transE_weights=True,
@@ -29,7 +29,7 @@ def create_config_dict():
         max_num_examples=-1,
         max_supervised_steps=1000000,
         transE_weights_saved_name='transE_weights.pt',
-
+        dataset_txt_file_path=None,
     ))
 
     return config_dict

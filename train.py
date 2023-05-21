@@ -13,7 +13,7 @@ from tqdm.auto import tqdm
 
 from environment import Env
 from networks import PolicyNNV2, PolicyNNV3
-from utils import Transition, construct_graph, pykeen_to_torchkge_dataset
+from utils import Transition, construct_graph, from_pykeen_to_torchkge_dataset, from_txt_to_dataset
 from transE_training import train_transE_model
 from typing import Optional
 from datasets import SupervisedLearningDataset
@@ -290,7 +290,15 @@ if __name__ == "__main__":
     args = read_config_file("config.yaml")
 
     print("Args:", args)
-    kg_train = pykeen_to_torchkge_dataset(args.kg_dataset, max_num_examples=args.max_num_examples)
+
+    if args.dataset_txt_file_path is not None:
+        kg_train = from_txt_to_dataset(args.dataset_txt_file_path)
+    elif args.kg_dataset is not None:
+        kg_train = from_pykeen_to_torchkge_dataset(args.kg_dataset,
+                                                   max_num_examples=args.max_num_examples)
+    else:
+        raise ValueError('`dataset_txt_file_path` and `kg_dataset` are None, '
+                         'one of them should have a value.')
 
     if args.train_transE:
         print("Training TransE Model...")
