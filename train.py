@@ -84,7 +84,7 @@ def train_supervised(
                     running_loss += loss.item()
                 iterator.set_description(
                     f"Epoch: {i}/{num_epochs} - "
-                    f"Loss: {running_loss / len(train_dl)}"
+                    f"Loss: {running_loss / len(train_dl)} - "
                     f"Not found episodes: {len(episodes)}/{num_generated_episodes}"
                 )
 
