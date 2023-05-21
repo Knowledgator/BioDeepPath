@@ -1,3 +1,5 @@
 weights/
 data/
 *.pt
+demos.ipynb
+__pycache__/

@@ -15,6 +15,8 @@ except ImportError:
 
 from torchkge.data_structures import KnowledgeGraph
 import pandas as pd
+from collections import OrderedDict
+from typing import List, Tuple
 
 
 Transition = namedtuple(
@@ -199,7 +201,9 @@ def construct_graph(ds):
     return G
 
 
-def pykeen_to_torchkge_dataset(identifier, split="training", max_num_examples=-1, *args, **kwargs):
+def from_pykeen_to_torchkge_dataset(
+    identifier, split="training", max_num_examples=-1, *args, **kwargs
+):
     if pykeen_datasets is None:
         raise ImportError(
             "In order to use a dataset from `pykeen` you need to "
@@ -216,8 +220,10 @@ def pykeen_to_torchkge_dataset(identifier, split="training", max_num_examples=-1
     elif max_num_examples > 0:
         triples = splitted_dataset.triples[:max_num_examples, :]
     else:
-        raise ValueError('Expected `max_num_examples` to be equal to -1 or '
-                         f'bigger than zero. Recieved: {max_num_examples}')
+        raise ValueError(
+            "Expected `max_num_examples` to be equal to -1 or "
+            f"bigger than zero. Recieved: {max_num_examples}"
+        )
 
     print("Creating DataFrame...")
     df = pd.DataFrame(
@@ -237,3 +243,96 @@ def pykeen_to_torchkge_dataset(identifier, split="training", max_num_examples=-1
     )
     print("Knowledge Graph created...")
     return kg
+
+
+class KnowledgeGraphTokenizer:
+    def __init__(self) -> None:
+        self.entity_to_id = OrderedDict()
+        self.id_to_entity = OrderedDict()
+        self.relation_to_id = OrderedDict()
+        self.id_to_relation = OrderedDict()
+
+    def add_entity_to_tokenizer(self, entity):
+        if entity not in self.entity_to_id:
+            idx = len(self.entity_to_id)
+            self.entity_to_id[entity] = idx
+            self.id_to_entity[idx] = entity
+
+    def add_relation_to_tokenizer(self, relation):
+        if relation not in self.relation_to_id:
+            idx = len(self.relation_to_id)
+            self.relation_to_id[relation] = idx
+            self.id_to_relation[idx] = relation
+
+    def encode_entity(self, entity):
+        return self.entity_to_id[entity]
+
+    def encode_relation(self, relation):
+        return self.relation_to_id[relation]
+
+    def decode_entity(self, entity_id):
+        return self.id_to_entity[entity_id]
+
+    def decode_relation(self, relation_id):
+        return self.id_to_relation[relation_id]
+
+
+def _from_txt_file_to_dataframe_and_tokenizer(
+    filename: str,
+    sep: str = "\t",
+    order: List = ["from", "rel", "to"],
+    header_row_exists=True,
+) -> Tuple[pd.DataFrame, KnowledgeGraphTokenizer]:
+
+    if len([o for o in order if o in {"from", "rel", "to"}]) < 3:
+        raise ValueError(
+            "Expected `order` to be a list that contains "
+            f'`["from", "rel", "to"]`. Recieved: {order}'
+        )
+
+    tokenizer = KnowledgeGraphTokenizer()
+    from_idx = order.index("from")
+    rel_idx = order.index("rel")
+    to_idx = order.index("to")
+    contents = []
+
+    with open(filename, "r") as f:
+        if header_row_exists:
+            _ = f.readline().strip().split(sep)
+
+        for line in f:
+            current_row = line.strip().lower().split(sep)
+
+            if len(current_row) < 3:
+                continue
+
+            tokenizer.add_entity_to_tokenizer(current_row[from_idx])
+            tokenizer.add_entity_to_tokenizer(current_row[to_idx])
+            tokenizer.add_relation_to_tokenizer(current_row[rel_idx])
+            contents.append(
+                (
+                    current_row[from_idx],
+                    current_row[to_idx],
+                    current_row[rel_idx],
+                )
+            )
+        df = pd.DataFrame.from_dict(contents)
+
+        df.columns = ["from", "to", "rel"]
+        return df, tokenizer
+
+
+def from_txt_to_dataset(
+    filename: str,
+    sep: str = "\t",
+    order: List = ["from", "rel", "to"],
+    header_row_exists=True,
+):
+    df, tokenizer = _from_txt_file_to_dataframe_and_tokenizer(
+        filename, sep, order, header_row_exists
+    )
+
+    dataset = KnowledgeGraph(
+        df, ent2ix=tokenizer.entity_to_id, rel2ix=tokenizer.rel_to_id
+    )
+    return dataset

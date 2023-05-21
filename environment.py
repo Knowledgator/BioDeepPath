@@ -227,7 +227,7 @@ class Env:
                 f"num_entities: {len(self.entities)}"
                 f"num_itermediates: {num_paths}"
             )
-        
+
         for _ in range(num_paths):
             intermediate_node = random.choice(self.nodes)
             while (
