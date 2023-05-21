@@ -298,6 +298,7 @@ if __name__ == "__main__":
             kg_train,
             normalize_after_training=args.normalize_transE_weights,
             save_dir=args.save_weights_path,
+            model_name=args.transE_weights_saved_name
         )
     else:
         model = TransEModel(
@@ -306,7 +307,7 @@ if __name__ == "__main__":
             n_relations=kg_train.n_rel,
         )
         model.load_state_dict(torch.load(os.path.join(args.save_weights_path,
-                                                      'trans_e_model_weights.pt')))
+                                                      args.transE_weights_saved_name)))
         print("TransE weights loaded.")
 
         if args.normalize_transE_weights:

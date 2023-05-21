@@ -71,6 +71,7 @@ def train_transE_model(
     margin=0.5,
     normalize_after_training=True,
     save_dir=None,
+    model_name='transE_weights.pt'
 ):
     model = TransEModel(
         embed_dim, dataset.n_ent, dataset.n_rel, dissimilarity_type="L2"
@@ -110,9 +111,9 @@ def train_transE_model(
         )
 
     if save_dir is None:
-        save_dir = "trans_e_model_weights.pt"
+        save_dir = model_name
     else:
-        save_dir = os.path.join(save_dir, "trans_e_model_weights.pt")
+        save_dir = os.path.join(save_dir, model_name)
 
     torch.save(model.state_dict(), save_dir)
     if normalize_after_training:
