@@ -17,6 +17,8 @@ from torchkge.data_structures import KnowledgeGraph
 import pandas as pd
 from collections import OrderedDict
 from typing import List, Tuple
+from sklearn.model_selection import train_test_split
+import json
 
 
 Transition = namedtuple(
@@ -276,12 +278,46 @@ class KnowledgeGraphTokenizer:
     def decode_relation(self, relation_id):
         return self.id_to_relation[relation_id]
 
+    def to_json(self):
+        with open("entities_ids.json", "w") as f:
+            json.dump(self.entity_to_id, f)
+
+        with open("relations_ids.json", "w") as f:
+            json.dump(self.relation_to_id, f)
+
+    @classmethod
+    def from_json(cls):
+        instance = cls()
+
+        with open("entities_ids.json", "r") as f:
+            instance.entity_to_id = OrderedDict(
+                json.load(
+                    f, object_hook=lambda d: {k: int(v) for k, v in d.items()}
+                )
+            )
+            instance.id_to_entity = {
+                v: k for k, v in instance.entity_to_id.items()
+            }
+
+        with open("relations_ids.json", "r") as f:
+            instance.relation_to_id = OrderedDict(
+                json.load(
+                    f, object_hook=lambda d: {k: int(v) for k, v in d.items()}
+                )
+            )
+            instance.id_to_relation = {
+                v: k for k, v in instance.relation_to_id.items()
+            }
+
+        return instance
+
 
 def _from_txt_file_to_dataframe_and_tokenizer(
     filename: str,
     sep: str = "\t",
     order: List = ["from", "rel", "to"],
     header_row_exists=True,
+    test_size=0.1,
 ) -> Tuple[pd.DataFrame, KnowledgeGraphTokenizer]:
 
     if len([o for o in order if o in {"from", "rel", "to"}]) < 3:
@@ -319,7 +355,14 @@ def _from_txt_file_to_dataframe_and_tokenizer(
         df = pd.DataFrame.from_dict(contents)
 
         df.columns = ["from", "to", "rel"]
-        return df, tokenizer
+
+        df_train, df_test = train_test_split(
+            df, test_size=test_size, random_state=7, shuffle=True
+        )
+
+        df_train.to_csv("training_set.csv", index=False)
+        df_test.to_csv("testing_set.csv", index=False)
+        return df_train, tokenizer
 
 
 def from_txt_to_dataset(
@@ -333,6 +376,8 @@ def from_txt_to_dataset(
     )
 
     dataset = KnowledgeGraph(
-        df, ent2ix=dict(tokenizer.entity_to_id), rel2ix=dict(tokenizer.relation_to_id)
+        df,
+        ent2ix=dict(tokenizer.entity_to_id),
+        rel2ix=dict(tokenizer.relation_to_id),
     )
     return dataset
