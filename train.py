@@ -64,7 +64,7 @@ def train_supervised(
 
     for i in range(1, num_epochs + 1):
         running_loss = 0
-        with tqdm(train_dl, total=max_supervised_steps) as iterator:
+        with tqdm(train_dl, total=max_supervised_steps if max_supervised_steps != -1 else len(train_dl)) as iterator:
             for step, batch in enumerate(iterator):
                 h, t, _ = int(batch[0][0]), int(batch[1][0]), int(batch[2][0])
                 episodes = env.generate_episodes(h, t, num_generated_episodes)
@@ -86,7 +86,8 @@ def train_supervised(
                     f"Epoch: {i}/{num_epochs} - "
                     f"Loss: {running_loss / len(train_dl)}"
                 )
-                if step == max_supervised_steps:
+
+                if max_supervised_steps != -1 and step == max_supervised_steps:
                     break
 
         if save_dir is not None:
