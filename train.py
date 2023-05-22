@@ -339,6 +339,12 @@ if __name__ == "__main__":
             save_dir=args.save_weights_path,
         )
     elif args.task == "rl":
+        if args.rl_phase_load_from_checkpoint is not None:
+            checkpoint = f"policy_sl_phase_weights_epoch_{args.rl_phase_load_from_checkpoint}"
+            sl_saved_weights = os.path.join(args.save_weights_path, checkpoint)
+            if os.path.exists(sl_saved_weights):
+                policy.policy_nn.load_state_dict(torch.load(sl_saved_weights))
+
         train_rl(
             policy_model=policy,
             env=env,

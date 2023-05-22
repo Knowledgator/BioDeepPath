@@ -30,6 +30,7 @@ def create_config_dict():
         max_supervised_steps=1000000,
         transE_weights_saved_name='transE_weights.pt',
         dataset_txt_file_path=None,
+        rl_phase_load_from_checkpoint=None,
     ))
 
     return config_dict
