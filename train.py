@@ -308,7 +308,8 @@ if __name__ == "__main__":
             kg_train,
             normalize_after_training=args.normalize_transE_weights,
             save_dir=args.save_weights_path,
-            model_name=args.transE_weights_saved_name
+            model_name=args.transE_weights_saved_name,
+            epochs=args.transE_train_epochs,
         )
     else:
         model = TransEModel(
