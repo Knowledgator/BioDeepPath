@@ -356,14 +356,14 @@ def _from_txt_file_to_dataframe_and_tokenizer(
 
         df.columns = ["from", "to", "rel"]
 
-        # df_train, df_test = train_test_split(
-        #     df, test_size=test_size, random_state=7, shuffle=True
-        # )
+        df_train, df_test = train_test_split(
+            df, test_size=test_size, random_state=7, shuffle=True
+        )
 
         df.to_csv("training_set.csv", index=False)
-        # df_test.to_csv("testing_set.csv", index=False)
+        df_test.to_csv("testing_set.csv", index=False)
         tokenizer.to_json()
-        return df, tokenizer
+        return df_train, tokenizer
 
 
 def from_txt_to_dataset(
