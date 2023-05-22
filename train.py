@@ -345,6 +345,8 @@ if __name__ == "__main__":
             if os.path.exists(sl_saved_weights):
                 policy.policy_nn.load_state_dict(torch.load(sl_saved_weights))
 
+                print(f'Loaded from checkpoint {args.rl_phase_load_from_checkpoint}')
+
         train_rl(
             policy_model=policy,
             env=env,
