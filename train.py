@@ -12,11 +12,15 @@ from torchkge import TransEModel
 from tqdm.auto import tqdm
 
 from environment import Env
-from networks import PolicyNNV2, PolicyNNV3
-from utils import Transition, construct_graph, from_pykeen_to_torchkge_dataset, from_txt_to_dataset
+from networks import PolicyNNV2
+from utils import (
+    Transition,
+    construct_graph,
+    from_pykeen_to_torchkge_dataset,
+    from_txt_to_dataset,
+)
 from transE_training import train_transE_model
 from typing import Optional
-from datasets import SupervisedLearningDataset
 
 seed = 7
 torch.manual_seed(seed)
@@ -64,7 +68,12 @@ def train_supervised(
 
     for i in range(1, num_epochs + 1):
         running_loss = 0
-        with tqdm(train_dl, total=max_supervised_steps if max_supervised_steps != -1 else len(train_dl)) as iterator:
+        with tqdm(
+            train_dl,
+            total=max_supervised_steps
+            if max_supervised_steps != -1
+            else len(train_dl),
+        ) as iterator:
             for step, batch in enumerate(iterator):
                 h, t, _ = int(batch[0][0]), int(batch[1][0]), int(batch[2][0])
                 episodes = env.generate_episodes(h, t, num_generated_episodes)
@@ -296,11 +305,14 @@ if __name__ == "__main__":
     if args.dataset_txt_file_path is not None:
         kg_train = from_txt_to_dataset(args.dataset_txt_file_path)
     elif args.kg_dataset is not None:
-        kg_train = from_pykeen_to_torchkge_dataset(args.kg_dataset,
-                                                   max_num_examples=args.max_num_examples)
+        kg_train = from_pykeen_to_torchkge_dataset(
+            args.kg_dataset, max_num_examples=args.max_num_examples
+        )
     else:
-        raise ValueError('`dataset_txt_file_path` and `kg_dataset` are None, '
-                         'one of them should have a value.')
+        raise ValueError(
+            "`dataset_txt_file_path` and `kg_dataset` are None, "
+            "one of them should have a value."
+        )
 
     if args.train_transE:
         print("Training TransE Model...")
@@ -317,12 +329,17 @@ if __name__ == "__main__":
             n_entities=kg_train.n_ent,
             n_relations=kg_train.n_rel,
         )
-        model.load_state_dict(torch.load(os.path.join(args.save_weights_path,
-                                                      args.transE_weights_saved_name)))
+        model.load_state_dict(
+            torch.load(
+                os.path.join(
+                    args.save_weights_path, args.transE_weights_saved_name
+                )
+            )
+        )
         print("TransE weights loaded.")
 
         if args.normalize_transE_weights:
-            print('TransE weights normalized.')
+            print("TransE weights normalized.")
             model.normalize_parameters()
 
     knowledge_graph = construct_graph(kg_train)
@@ -346,7 +363,9 @@ if __name__ == "__main__":
             if os.path.exists(sl_saved_weights):
                 policy.policy_nn.load_state_dict(torch.load(sl_saved_weights))
 
-                print(f'Loaded from checkpoint {args.rl_phase_load_from_checkpoint}')
+                print(
+                    f"Loaded from checkpoint {args.rl_phase_load_from_checkpoint}"
+                )
 
         train_rl(
             policy_model=policy,

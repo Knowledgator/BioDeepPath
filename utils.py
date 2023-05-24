@@ -382,3 +382,39 @@ def from_txt_to_dataset(
         rel2ix=dict(tokenizer.relation_to_id),
     )
     return dataset
+
+
+def from_openbiolink_to_dataset(
+    filename: str, tokenizer_exists=False, sep: str = "\t", source="STRING"
+):
+    df = pd.read_csv(
+        filename,
+        sep=sep,
+        header=None,
+        names=["from", "rel", "to", "quality", "unknown", "source"],
+    )
+
+    source_df = df[df["source"] == source]
+    source_df = source_df.iloc[:, :3]
+
+    if not tokenizer_exists:
+        tokenizer = KnowledgeGraphTokenizer()
+    else:
+        tokenizer = KnowledgeGraphTokenizer.from_json()
+
+    for from_ent, relation, to_ent in zip(
+        source_df["from"], source_df["rel"], source_df["to"]
+    ):
+        tokenizer.add_entity_to_tokenizer(from_ent)
+        tokenizer.add_entity_to_tokenizer(to_ent)
+        tokenizer.add_relation_to_tokenizer(relation)
+
+    source_df = source_df.reindex(columns=["from", "to", "rel"])
+    dataset = KnowledgeGraph(
+        df=source_df,
+        ent2ix=dict(tokenizer.entity_to_id),
+        rel2ix=dict(tokenizer.relation_to_id),
+    )
+
+    tokenizer.to_json()
+    return dataset
