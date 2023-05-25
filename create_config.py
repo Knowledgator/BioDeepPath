@@ -31,7 +31,9 @@ def create_config_dict():
         transE_weights_saved_name='transE_weights.pt',
         dataset_txt_file_path=None,
         rl_phase_load_from_checkpoint=None,
-        transE_train_epochs=1000
+        transE_train_epochs=1000,
+        tokenizer_exists=False,
+        openbiolink_dataset=None
     ))
 
     return config_dict

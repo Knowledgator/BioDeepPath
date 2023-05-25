@@ -18,6 +18,7 @@ from utils import (
     construct_graph,
     from_pykeen_to_torchkge_dataset,
     from_txt_to_dataset,
+    from_openbiolink_to_dataset
 )
 from transE_training import train_transE_model
 from typing import Optional
@@ -308,6 +309,9 @@ if __name__ == "__main__":
         kg_train = from_pykeen_to_torchkge_dataset(
             args.kg_dataset, max_num_examples=args.max_num_examples
         )
+    elif args.openbiolink_dataset is not None:
+        kg_train = from_openbiolink_to_dataset(args.openbiolink_dataset,
+                                               args.tokenizer_exists)
     else:
         raise ValueError(
             "`dataset_txt_file_path` and `kg_dataset` are None, "
