@@ -22,11 +22,14 @@ from utils import (
 )
 from transE_training import train_transE_model
 from typing import Optional
+import multiprocessing as mp
 
 seed = 7
 torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
+
+
 
 
 class PolicyNetwork(nn.Module):
@@ -65,7 +68,9 @@ def train_supervised(
     device: str = "cuda",
     save_dir: Optional[str] = None,
 ):
-    train_dl = data.DataLoader(train_ds, batch_size=1, shuffle=True)
+    batch_size = 128
+    number_processes = 20
+    train_dl = data.DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
     for i in range(1, num_epochs + 1):
         running_loss = 0
@@ -76,22 +81,29 @@ def train_supervised(
             else len(train_dl),
         ) as iterator:
             for step, batch in enumerate(iterator):
-                h, t, _ = int(batch[0][0]), int(batch[1][0]), int(batch[2][0])
-                episodes = env.generate_episodes(h, t, num_generated_episodes)
+                episodes = []
+
+                with mp.Pool(number_processes) as pool:
+                    for h, t, r in zip(batch[0], batch[1], batch[2]):
+                        h, t, r = h.item(), t.item(), r.item()
+                        episodes += pool.apply(env.generate_episodes, (h, t, num_generated_episodes))
+
+                pool.join()
+                state_batch = []
+                action_batch = []
                 for episode in episodes:
-                    state_batch = []
-                    action_batch = []
                     for transition in episode:
                         state_batch.append(transition.state)
                         action_batch.append(torch.tensor([transition.action]))
-                    state_batch = torch.cat(state_batch, dim=0).to(device)
-                    action_batch = torch.cat(action_batch, dim=0).to(device)
-                    policy_model.optimizer.zero_grad(set_to_none=True)
-                    preds = policy_model(state_batch)
-                    loss = policy_model.compute_loss(preds, action_batch)
-                    loss.backward()
-                    policy_model.optimizer.step()
-                    running_loss += loss.item()
+
+                state_batch = torch.cat(state_batch, dim=0).to(device)
+                action_batch = torch.cat(action_batch, dim=0).to(device)
+                policy_model.optimizer.zero_grad(set_to_none=True)
+                preds = policy_model(state_batch)
+                loss = policy_model.compute_loss(preds, action_batch)
+                loss.backward()
+                policy_model.optimizer.step()
+                running_loss += loss.item()
                 iterator.set_description(
                     f"Epoch: {i}/{num_epochs} - "
                     f"Loss: {running_loss / len(train_dl)} - "
