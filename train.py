@@ -65,7 +65,7 @@ def train_supervised(
     device: str = "cuda",
     save_dir: Optional[str] = None,
 ):
-    batch_size = 16
+    batch_size = 128
     train_dl = data.DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
     for i in range(1, num_epochs + 1):
