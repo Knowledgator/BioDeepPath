@@ -30,8 +30,6 @@ np.random.seed(seed)
 random.seed(seed)
 
 
-
-
 class PolicyNetwork(nn.Module):
     def __init__(self, state_dim, action_space, learning_rate=0.0001):
         super(PolicyNetwork, self).__init__()
@@ -68,9 +66,8 @@ def train_supervised(
     device: str = "cuda",
     save_dir: Optional[str] = None,
 ):
-    batch_size = 128
+    batch_size = 16
     number_processes = 5
-    pool = mp.Pool(number_processes)
     train_dl = data.DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
     for i in range(1, num_epochs + 1):
@@ -84,7 +81,7 @@ def train_supervised(
             for step, batch in enumerate(iterator):
                 episodes = []
 
-                with pool:
+                with mp.Pool(number_processes) as pool:
                     for h, t, r in zip(batch[0], batch[1], batch[2]):
                         h, t, r = h.item(), t.item(), r.item()
                         episodes += pool.apply(env.generate_episodes, (h, t, num_generated_episodes))
