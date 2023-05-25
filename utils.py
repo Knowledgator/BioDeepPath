@@ -404,8 +404,9 @@ def from_openbiolink_to_dataset(
         tokenizer = KnowledgeGraphTokenizer.from_json()
 
     for from_ent, relation, to_ent in zip(
-        source_df["from"], source_df["rel"], source_df["to"]
+        source_df["from"].values, source_df["rel"].values, source_df["to"].values
     ):
+        print(from_ent, relation, to_ent)
         tokenizer.add_entity_to_tokenizer(from_ent)
         tokenizer.add_entity_to_tokenizer(to_ent)
         tokenizer.add_relation_to_tokenizer(relation)
