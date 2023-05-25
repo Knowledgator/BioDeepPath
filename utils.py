@@ -399,7 +399,6 @@ def from_openbiolink_to_dataset(
 
     if not tokenizer_exists:
         tokenizer = KnowledgeGraphTokenizer()
-        tokenizer.to_json()
     else:
         tokenizer = KnowledgeGraphTokenizer.from_json()
 
@@ -417,4 +416,6 @@ def from_openbiolink_to_dataset(
         ent2ix=dict(tokenizer.entity_to_id),
         rel2ix=dict(tokenizer.relation_to_id),
     )
+    if not tokenizer_exists:
+        tokenizer.to_json()
     return dataset
