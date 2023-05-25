@@ -399,16 +399,19 @@ def from_openbiolink_to_dataset(
 
     if not tokenizer_exists:
         tokenizer = KnowledgeGraphTokenizer()
+        for from_ent, relation, to_ent in zip(
+            source_df["from"].values,
+            source_df["rel"].values,
+            source_df["to"].values,
+        ):
+            # print(from_ent, relation, to_ent)
+            tokenizer.add_entity_to_tokenizer(from_ent)
+            tokenizer.add_entity_to_tokenizer(to_ent)
+            tokenizer.add_relation_to_tokenizer(relation)
+
+        tokenizer.to_json()
     else:
         tokenizer = KnowledgeGraphTokenizer.from_json()
-
-    for from_ent, relation, to_ent in zip(
-        source_df["from"].values, source_df["rel"].values, source_df["to"].values
-    ):
-        # print(from_ent, relation, to_ent)
-        tokenizer.add_entity_to_tokenizer(from_ent)
-        tokenizer.add_entity_to_tokenizer(to_ent)
-        tokenizer.add_relation_to_tokenizer(relation)
 
     source_df = source_df.reindex(columns=["from", "to", "rel"])
     dataset = KnowledgeGraph(
@@ -416,6 +419,4 @@ def from_openbiolink_to_dataset(
         ent2ix=dict(tokenizer.entity_to_id),
         rel2ix=dict(tokenizer.relation_to_id),
     )
-    if not tokenizer_exists:
-        tokenizer.to_json()
     return dataset
