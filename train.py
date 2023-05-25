@@ -69,7 +69,7 @@ def train_supervised(
     save_dir: Optional[str] = None,
 ):
     batch_size = 128
-    number_processes = 20
+    number_processes = 5
     train_dl = data.DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
     for i in range(1, num_epochs + 1):
@@ -107,7 +107,7 @@ def train_supervised(
                 iterator.set_description(
                     f"Epoch: {i}/{num_epochs} - "
                     f"Loss: {running_loss / len(train_dl)} - "
-                    f"Found episodes: {len(episodes)}/{num_generated_episodes}"
+                    f"Found episodes: {len(episodes)}/{num_generated_episodes*batch_size}"
                 )
 
                 if max_supervised_steps != -1 and step == max_supervised_steps:
