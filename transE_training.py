@@ -23,12 +23,16 @@ def train_transE_model_on_freebase15k(
     )
     criterion = MarginLoss(margin)
 
+
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         model.cuda()
         criterion.cuda()
 
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                     factor=0.1,
+                                                     patience=5)
 
     sampler = BernoulliNegativeSampler(kg_train)
     dataloader = DataLoader(kg_train, batch_size=batch_size, use_cuda="all")
@@ -47,6 +51,7 @@ def train_transE_model_on_freebase15k(
             loss = criterion(pos, neg)
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             running_loss += loss.item()
         iterator.set_description(
