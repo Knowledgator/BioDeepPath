@@ -22,7 +22,6 @@ from utils import (
 )
 from transE_training import train_transE_model
 from typing import Optional
-import multiprocessing as mp
 
 seed = 7
 torch.manual_seed(seed)
@@ -67,7 +66,6 @@ def train_supervised(
     save_dir: Optional[str] = None,
 ):
     batch_size = 16
-    number_processes = 5
     train_dl = data.DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
     for i in range(1, num_epochs + 1):
@@ -81,12 +79,10 @@ def train_supervised(
             for step, batch in enumerate(iterator):
                 episodes = []
 
-                with mp.Pool(number_processes) as pool:
-                    for h, t, r in zip(batch[0], batch[1], batch[2]):
-                        h, t, r = h.item(), t.item(), r.item()
-                        episodes += pool.apply(env.generate_episodes, (h, t, num_generated_episodes))
+                for h, t, r in zip(batch[0], batch[1], batch[2]):
+                    h, t, r = h.item(), t.item(), r.item()
+                    episodes += env.generate_episodes(h, t, num_generated_episodes)
 
-                pool.join()
                 state_batch = []
                 action_batch = []
                 for episode in episodes:
