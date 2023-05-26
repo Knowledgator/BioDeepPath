@@ -68,6 +68,9 @@ def train_supervised(
     batch_size = 128
     train_dl = data.DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
+    if max_supervised_steps != 0:
+        max_supervised_steps //= batch_size
+
     for i in range(1, num_epochs + 1):
         running_loss = 0
         with tqdm(
