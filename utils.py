@@ -385,7 +385,7 @@ def from_txt_to_dataset(
 
 
 def from_openbiolink_to_dataset(
-    filename: str, tokenizer_exists=False, sep: str = "\t", source="STRING"
+    filename: str, tokenizer_exists=False, sep: str = "\t", source="STITCH"
 ):
     df = pd.read_csv(
         filename,
@@ -396,6 +396,8 @@ def from_openbiolink_to_dataset(
 
     source_df = df[df["source"] == source]
     source_df = source_df.iloc[:, :3]
+
+    print(f"Number of examples: {source_df.shape[0]}")
 
     if not tokenizer_exists:
         tokenizer = KnowledgeGraphTokenizer()

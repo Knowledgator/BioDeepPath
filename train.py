@@ -346,8 +346,7 @@ if __name__ == "__main__":
             torch.load(
                 os.path.join(
                     args.save_weights_path, args.transE_weights_saved_name
-                )
-            )
+                ), map_location=args.device),
         )
         print("TransE weights loaded.")
 
