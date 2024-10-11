@@ -1,0 +1,7 @@
+weights/
+data/
+*.pt
+*.ipynb
+*.txt
+*.yaml
+__pycache__/
